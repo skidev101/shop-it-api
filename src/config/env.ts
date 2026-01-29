@@ -12,5 +12,9 @@ export const env = {
   DATABASE_URI: process.env.DATABASE_URI!,
   API_VERSION: process.env.API_VERSION || "v1",
   JWT_SECRET: process.env.JWT_SECRET!,
-  REFRESH_SECRET: process.env.REFRESH_SECRET!
+  REFRESH_SECRET: process.env.REFRESH_SECRET!,
+  SMTP_HOST: process.env.SMTP_HOST!,
+  EMAIL_PORT: process.env.EMAIL_PORT!,
+  EMAIL_USER: process.env.EMAIL_USER!,
+  EMAIL_PASSWORD: process.env.EMAIL_PASSWORD!
 }
