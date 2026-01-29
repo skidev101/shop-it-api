@@ -3,12 +3,46 @@ import { Document, model, Schema, Types } from "mongoose";
 export interface IUser extends Document {
   _id: Types.ObjectId;
   email: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   passwordHash: string;
+  role: "customer" | "admin" | "vendor";
+  phoneNumber?: string;
+  isVerified: boolean;
   timezone: string;
+  addresses?: {
+    street: string;
+    city: string;
+    country: string;
+    zipCode: string;
+    isDefault: boolean;
+  }[];
   createdAt: Date;
   updatedAt: Date;
 }
+
+const AddressSchema = new Schema({
+  street:{
+    type: String,
+    required: true
+  },
+  city: {
+    type: String,
+    required: true
+  },
+  country: {
+    type: String,
+    required: true
+  },
+  zipCode: {
+    type: String,
+    required: true
+  },
+  isDefault: {
+    type: Boolean,
+    default: false
+  }
+})
 
 const UserSchema = new Schema<IUser>(
   {
@@ -19,7 +53,11 @@ const UserSchema = new Schema<IUser>(
       lowercase: true,
       trim: true,
     },
-    name: {
+    firstName: {
+      type: String,
+      trim: true,
+    },
+    lastName: {
       type: String,
       trim: true,
     },
@@ -28,11 +66,25 @@ const UserSchema = new Schema<IUser>(
       required: true,
       select: false,
     },
+    role: {
+      type: String,
+      enum: ["customer", "admin", "vendor"],
+      default: "customer"
+    },
+    phoneNumber: {
+      type: String,
+      trim: true,
+    },
+    isVerified: {
+      type: Boolean,
+      default: false
+    },
     timezone: {
       type: String,
       trim: true,
       default: "Africa/Lagos",
     },
+    addresses: [AddressSchema]
   },
   { timestamps: true }
 );
