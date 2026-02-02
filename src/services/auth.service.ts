@@ -109,11 +109,13 @@ export class AuthService {
       throw new ConflictError("Account already exists");
     }
 
+    const hashedPassword = await bcrypt.hash(data.password, 12);
+
     const user = await User.create({
       email: data.email,
       firstName: data.firstName,
       lastName: data.lastName,
-      passwordHash: data.password,
+      passwordHash: hashedPassword,
       role: "customer",
       isVerified: false,
       timezone: "Africa/Lagos",
@@ -148,8 +150,8 @@ export class AuthService {
     }
 
     const isPasswordValid = await bcrypt.compare(
-      user.passwordHash,
-      data.password
+      data.password,
+      user.passwordHash
     );
     if (!isPasswordValid) {
       throw new ValidationError("Invalid credentials");
@@ -260,6 +262,53 @@ export class AuthService {
 
     return SuccessRes({
       message: "Logged out successfully",
+    });
+  }
+
+  async isTokenBlacklisted(token: string) {
+    const blacklisted = await TokenBlacklist.findOne({ token });
+    return !!blacklisted;
+  }
+
+  async forgotPassword(email: string) {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return new NotFoundError("User");
+    }
+
+    await Otp.deleteMany({ email });
+
+    const otp = this.generateOTP();
+    const expiresAt = new Date(Date.now() * 10 * 60 * 1000);
+    const hashedOtp = await bcrypt.hash(otp, 12);
+
+    await Otp.create({
+      email,
+      otp: hashedOtp,
+      expiresAt,
+      verified: false,
+    });
+
+    const mailConfig = {
+      from: "stuffworks101@gmail.com",
+      to: email,
+      subject: "Shop-It - Verify your Email",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Email Verification</h2>
+          <p>Your verification code is:</p>
+          <h1 style="color: #cc6300; font-size: 32px; text-align: center; letter-spacing: 5px;">${otp}</h1>
+          <p>This code will expire in 10 minutes.</p>
+          <p>If you didn't request this code, please ignore this email.</p>
+        </div>
+      `,
+    };
+
+    await mailer.sendMail(mailConfig);
+    logger.info("Password reset mail sent");
+
+    return SuccessRes({
+      message: "Password reset mail sent successfully",
     });
   }
 }
