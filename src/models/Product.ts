@@ -1,10 +1,11 @@
 import { Document, Schema, Types, model } from "mongoose";
 
 export interface IProduct extends Document {
-  _id: Types.ObjectId;
+  uploadedBy: Types.ObjectId;
   name: string;
   slug: string;
   description: string;
+  stock: number;
   price: number;
   comparePrice?: number;
   category: string;
@@ -13,6 +14,7 @@ export interface IProduct extends Document {
     {
       name: string; // "color", "size"
       options: string[]; // ["red", "blue"]
+      stock: number;
     }
   ];
   specifications: Record<string, string>;
@@ -24,20 +26,29 @@ export interface IProduct extends Document {
 }
 
 const ProductSchema = new Schema<IProduct>({
+  uploadedBy: {
+    type: Schema.Types.ObjectId,
+    ref: "User",
+    required: [true, "UserId is required"]
+  },
   name: {
     type: String,
-    required: true,
+    required: [true, "Product name is required"],
     trim: true,
   },
   slug: {
     type: String,
-    required: true,
+    required: [true, "Product slug is required"],
     trim: true,
   },
   description: {
     type: String,
     required: true,
     trim: true,
+  },
+  stock: {
+    type: Number,
+    required: true
   },
   price: {
     type: Number,
@@ -63,6 +74,7 @@ const ProductSchema = new Schema<IProduct>({
       {
         name: String,
         options: [String],
+        stock: Number
       },
     ],
   },
@@ -77,13 +89,14 @@ const ProductSchema = new Schema<IProduct>({
     type: Boolean,
     required: true,
     default: false,
+    index: true
   },
   tags: {
     type: [String],
     required: true,
+    index: true
   },
 }, { timestamps: true });
 
-ProductSchema.index({ slug: 1 });
 
 export const Product = model<IProduct>("Product", ProductSchema);

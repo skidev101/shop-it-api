@@ -83,7 +83,7 @@ export const errorHandler = (
       url: req.url,
       method: req.method,
       ip: req.ip,
-      userId: (req as any).user?.id,
+      userId: (req as any).user?.userId,
     });
   } else {
     logger.warn('Client Error:', {

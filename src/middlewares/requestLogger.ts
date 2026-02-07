@@ -25,6 +25,3 @@ export const requestLogger = (
 
   next();
 };
-
-
-export default { requestLogger }

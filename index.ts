@@ -5,9 +5,10 @@ import express, { NextFunction, Request, Response, Express } from "express";
 import { env } from "./src/config/env";
 import router from "./src/routes";
 import cookieParser from "cookie-parser";
-import { ReqErrorHandler } from "./src/middlewares/error.middleware";
-import { logger } from "./lib/logger";
-import { requestLogger } from "./src/middlewares/requestLogger.middleware";
+import {requestLogger} from "./src/middlewares/requestLogger";
+import { logger } from "./src/lib/logger";
+import { errorHandler, notFoundHandler } from "./src/middlewares/errorHandler";
+import { connectDB } from "./src/config/db";
 
 const app: Express = express();
 const PORT = env.PORT;
@@ -21,10 +22,17 @@ app.use(requestLogger);
 
 app.use(`/api/${API_VERSION}/`, router);
 
-app.use(ReqErrorHandler);
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 app.listen(PORT, () => {
-  const env_label = env.IS_PROD ? "PRODUCTION" : "DEVELOPMENT";
-  logger.info(`[${env_label}]: Server listening on ${PORT}`)
-  // console.log(`API running on port ${PORT}`);
+  connectDB()
+    .then(() => {
+      const env_label = env.IS_PROD ? "PRODUCTION" : "DEVELOPMENT";
+      logger.info(`[${env_label}]: Server listening on ${PORT}`)
+
+    })
+    .catch((e) => {
+      console.error("Database connection error:", e);
+    })
 });

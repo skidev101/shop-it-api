@@ -1,9 +1,9 @@
 import jwt, { Jwt } from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import { v4 as uuidv4 } from "uuid";
 import { env } from "../config/env";
-import { Otp, User } from "../models";
+import { Otp, User, RefreshToken } from "../models";
 import {
-  ApiError,
   ConflictError,
   ForbiddenError,
   NotFoundError,
@@ -13,28 +13,24 @@ import {
 import mailer from "../config/mailer";
 import { logger } from "../lib/logger";
 import { SuccessRes } from "../utils/responses";
-import { LoginPayload, RegisterPayload, TokenPayload } from "../types/auth";
-import { TokenBlacklist } from "../models/TokenBlacklist";
+import { LoginPayload, RegisterPayload, AccessTokenPayload, RefreshTokenPayload } from "../types/auth";
 
 export class AuthService {
   private generateOTP = (): string => {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
-  private generateTokens = ({
-    userId,
-    email,
-  }: TokenPayload): { accessToken: string; refreshToken: string } => {
-    const accessToken = jwt.sign({ userId, email }, env.JWT_SECRET, {
+  private generateAccessToken(payload: AccessTokenPayload) {
+    return jwt.sign({ ...payload }, env.JWT_ACCESS_SECRET, {
       expiresIn: "15m",
     });
+  }
 
-    const refreshToken = jwt.sign({ userId, email }, env.JWT_SECRET, {
+  private generateRefreshToken(payload: RefreshTokenPayload) {
+    return jwt.sign({ ...payload }, env.JWT_REFRESH_SECRET, {
       expiresIn: "7d",
     });
-
-    return { accessToken, refreshToken };
-  };
+  }
 
   async sendVerificationEmail(email: string) {
     const existingUser = await User.findOne({ email });
@@ -44,18 +40,19 @@ export class AuthService {
     }
 
     const otp = this.generateOTP();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     const hashedOtp = await bcrypt.hash(otp, 12);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     await Otp.create({
       email,
       otp: hashedOtp,
       expiresAt,
-      verified: false,
+      isVerified: false,
+      use: "email_verification",
     });
 
     const mailConfig = {
-      from: "stuffworks101@gmail.com",
+      from: env.EMAIL_USER,
       to: email,
       subject: "Shop-It - Verify your Email",
       html: `
@@ -76,7 +73,7 @@ export class AuthService {
   }
 
   async verifyOtp(email: string, otp: string) {
-    const otpMatch = await Otp.findOne({ email, verified: false });
+    const otpMatch = await Otp.findOne({ email, isVerified: false });
 
     if (!otpMatch) {
       throw new NotFoundError("OTP");
@@ -86,62 +83,79 @@ export class AuthService {
       throw new UnauthorizedError("Otp has expired");
     }
 
-    const validOtp = await bcrypt.compare(otp, otpMatch.otp);
-    if (!validOtp) {
+    const isValid = await bcrypt.compare(otp, otpMatch.otp);
+    if (!isValid) {
       throw new UnauthorizedError("Inavalid or expired otp");
     }
 
-    otpMatch.verified = true;
+    otpMatch.isVerified = true;
     await otpMatch.save();
 
-    return SuccessRes({ message: "Email verification successful" });
+    return SuccessRes({ message: "OTP verification successful" });
   }
 
   async register(data: RegisterPayload) {
-    const isVerified = await Otp.findOne({ email: data.email, verified: true });
+    const isVerified = await Otp.findOne({
+      email: data.email,
+      use: "email_verification",
+      isVerified: true,
+    });
     if (!isVerified) {
-      throw new UnauthorizedError("Account not verified");
+      throw new UnauthorizedError("Email not verified");
     }
 
     const userExists = await User.findOne({ email: data.email });
-
     if (userExists) {
       throw new ConflictError("Account already exists");
     }
 
-    const hashedPassword = await bcrypt.hash(data.password, 12);
+    const passwordHash = await bcrypt.hash(data.password, 12);
 
     const user = await User.create({
       email: data.email,
       firstName: data.firstName,
       lastName: data.lastName,
-      passwordHash: hashedPassword,
+      passwordHash,
       role: "customer",
       isVerified: false,
       timezone: "Africa/Lagos",
     });
 
     await Otp.deleteOne({ _id: isVerified._id });
+    user.isVerified = true;
+    await user.save();
 
-    const { accessToken, refreshToken } = this.generateTokens({
+    const newJti = uuidv4();
+    const accessPayload = {
       userId: user._id.toString(),
       email: user.email,
-    });
+    };
+    const refreshPayload = {
+      userId: user._id.toString(),
+      jti: newJti
+    };
+    const newAccessToken = this.generateAccessToken(accessPayload);
+    const newRefreshToken = this.generateRefreshToken(refreshPayload);
+    const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 12);
 
-    const userObject = user.toObject();
+    await RefreshToken.create({
+      userId: user._id,
+      tokenHash: newRefreshTokenHash,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
 
     return SuccessRes({
       message: "Registeration successful",
       data: {
-        user: userObject,
-        accessToken,
-        refreshToken,
+        user: user.toObject(),
+        newAccessToken,
+        newRefreshToken,
       },
       statusCode: 201,
     });
   }
 
-  async login(data: LoginPayload) {
+  async login(data: LoginPayload, userAgent?: string, ip?: string) {
     const user = await User.findOne({ email: data.email }).select(
       "+passwordHash"
     );
@@ -157,136 +171,220 @@ export class AuthService {
       throw new ValidationError("Invalid credentials");
     }
 
-    const { accessToken, refreshToken } = this.generateTokens({
+    const newJti = uuidv4();
+    const accessPayload = {
       userId: user._id.toString(),
       email: user.email,
-    });
+    };
+    const refreshPayload = {
+      userId: user._id.toString(),
+      jti: newJti
+    };
+    const newAccessToken = this.generateAccessToken(accessPayload);
+    const newRefreshToken = this.generateRefreshToken(refreshPayload);
+    const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 12);
 
-    const userObj = user.toObject();
+    await RefreshToken.create({
+      userId: user._id,
+      tokenHash: newRefreshTokenHash,
+      userAgent,
+      ip,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
 
     return SuccessRes({
       message: "Login successful",
       data: {
-        user: userObj,
-        accessToken,
-        refreshToken,
+        user: user.toObject(),
+        newAccessToken,
+        newRefreshToken,
       },
       statusCode: 200,
     });
   }
 
-  async refreshToken(refreshToken: string) {
+  // try {
+  //   const decodedToken = jwt.verify(
+  //     refreshToken,
+  //     env.JWT_REFRESH_SECRET
+  //   ) as TokenPayload;
+
+  //   const isInBlacklist = await TokenBlacklist.findOne({
+  //     token: refreshToken,
+  //   });
+  //   if (isInBlacklist) {
+  //     throw new ForbiddenError("Expired token");
+  //   }
+
+  //   const user = await User.findById(decodedToken.userId);
+  //   if (!user) {
+  //     throw new NotFoundError("User not found");
+  //   }
+
+  //   const newTokens = this.generateTokens({
+  //     userId: user._id.toString(),
+  //     email: user.email,
+  //   });
+
+  //   const decoded = jwt.decode(refreshToken) as jwt.JwtPayload;
+  //   console.log("decoded token:", decoded);
+  //   if (decoded?.exp) {
+  //     await TokenBlacklist.create({
+  //       token: refreshToken,
+  //       expiresAt: new Date(decoded.exp * 1000),
+  //     });
+
+  //     console.log("created new blacklist token");
+  //   }
+
+  //   return SuccessRes({
+  //     message: "Token refreshed successfully",
+  //     data: newTokens,
+  //   });
+  // } catch (error) {
+  //   if (error instanceof jwt.JsonWebTokenError) throw new UnauthorizedError("Invalid refresh token");
+  //   throw error;
+  // }
+  async refreshToken(token: string, userAgent?: string, ip?: string) {
+    let payload: { userId: string; jti: string };
+
     try {
-      const decodedToken = jwt.verify(
-        refreshToken,
-        env.JWT_SECRET
-      ) as TokenPayload;
-
-      const isInBlacklist = await TokenBlacklist.findOne({
-        token: refreshToken,
-      });
-      if (isInBlacklist) {
-        throw new ForbiddenError("Expired token");
-      }
-
-      const user = await User.findById(decodedToken.userId);
-      if (!user) {
-        throw new NotFoundError("User not found");
-      }
-
-      const newTokens = this.generateTokens({
-        userId: user._id.toString(),
-        email: user.email,
-      });
-
-      const decoded = jwt.decode(refreshToken) as jwt.JwtPayload;
-      console.log("decoded token:", decoded);
-      if (decoded?.exp) {
-        await TokenBlacklist.create({
-          token: refreshToken,
-          expiresAt: new Date(decoded.exp * 1000),
-        });
-
-        console.log("created new blacklist token");
-      }
-
-      return SuccessRes({
-        message: "Token refreshed successfully",
-        data: newTokens,
-      });
+      payload = jwt.verify(token, env.JWT_REFRESH_SECRET) as { userId: string; jti: string };
     } catch (error) {
-      if (error) throw new UnauthorizedError("Invalid refresh token");
-      throw error;
-    }
-  }
-
-  async logout(accessToken: string, refreshToken?: string) {
-    if (!accessToken || accessToken.trim() === "") {
-      throw new ValidationError("Access token is required");
+      console.error("Error refreshing token", error)
+      throw new UnauthorizedError("Invalid or expired refresh token")
     }
 
-    const decodedAccessToken = jwt.decode(accessToken) as jwt.JwtPayload;
-    const decodedRefreshToken = refreshToken
-      ? (jwt.decode(refreshToken) as jwt.JwtPayload)
-      : null;
+    const tokenDoc = await RefreshToken.findOne({ 
+      jti: payload.jti,
+      isRevoked: false
+    });
 
-    if (!decodedAccessToken) {
-      return new ValidationError("Invalid access token");
+    if (!tokenDoc) {
+      await RefreshToken.updateMany(
+        { userId: payload.userId },
+        { isRevoked: true }
+      )
+      throw new UnauthorizedError("Refresh tokens revoked")
     }
 
-    if (decodedAccessToken.exp) {
-      const isBlacklisted = await TokenBlacklist.findOne({
-        token: accessToken,
-      });
-
-      if (!isBlacklisted) {
-        await TokenBlacklist.create({
-          token: accessToken,
-          expiresAt: new Date(decodedAccessToken.exp * 1000),
-        });
-      }
+    const isValid = await bcrypt.compare(token, tokenDoc.tokenHash);
+    if (!isValid) {
+      throw new UnauthorizedError("Refresh token mismatch")
     }
 
-    if (refreshToken && decodedRefreshToken?.exp) {
-      const isBlacklisted = await TokenBlacklist.findOne({
-        token: accessToken,
-      });
+    tokenDoc.isRevoked = true;
+    await tokenDoc.save();
 
-      if (!isBlacklisted) {
-        await TokenBlacklist.create({
-          token: refreshToken,
-          expiresAt: new Date(decodedRefreshToken.exp * 1000),
-        });
-      }
+    const user = await User.findById(tokenDoc.userId);
+    if (!user) {
+      throw new NotFoundError("User not found");
     }
+
+    const newJti = uuidv4();
+    const accessPayload = {
+      userId: user._id.toString(),
+      email: user.email,
+    };
+    const refreshPayload = {
+      userId: user._id.toString(),
+      jti: newJti
+    };
+    const newAccessToken = this.generateAccessToken(accessPayload);
+    const newRefreshToken = this.generateRefreshToken(refreshPayload);
+    const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 12);
+    
+    await RefreshToken.create({
+      userId: user._id,
+      jti: newJti,
+      tokenHash: newRefreshTokenHash,
+      userAgent,
+      ip,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
 
     return SuccessRes({
-      message: "Logged out successfully",
+      message: "Tokens refreshed",
+      data: { accessToken: newAccessToken, refreshToken: newRefreshToken },
     });
   }
 
-  async isTokenBlacklisted(token: string) {
-    const blacklisted = await TokenBlacklist.findOne({ token });
-    return !!blacklisted;
+  // async logout(accessToken: string, refreshToken?: string) {
+  //   if (!accessToken || accessToken.trim() === "") {
+  //     throw new ValidationError("Access token is required");
+  //   }
+
+  //   const decodedAccessToken = jwt.decode(accessToken) as jwt.JwtPayload;
+  //   const decodedRefreshToken = refreshToken
+  //     ? (jwt.decode(refreshToken) as jwt.JwtPayload)
+  //     : null;
+
+  //   if (!decodedAccessToken) {
+  //     throw new ValidationError("Invalid access token");
+  //   }
+
+  //   if (decodedAccessToken.exp) {
+  //     const isBlacklisted = await TokenBlacklist.findOne({
+  //       token: accessToken,
+  //     });
+
+  //     if (!isBlacklisted) {
+  //       await TokenBlacklist.create({
+  //         token: accessToken,
+  //         expiresAt: new Date(decodedAccessToken.exp * 1000),
+  //       });
+  //     }
+  //   }
+
+  //   if (refreshToken && decodedRefreshToken?.exp) {
+  //     const isBlacklisted = await TokenBlacklist.findOne({
+  //       token: refreshToken,
+  //     });
+
+  //     if (!isBlacklisted) {
+  //       await TokenBlacklist.create({
+  //         token: refreshToken,
+  //         expiresAt: new Date(decodedRefreshToken.exp * 1000),
+  //       });
+  //     }
+  //   }
+
+  //   return SuccessRes({
+  //     message: "Logged out successfully",
+  //   });
+  // }
+
+  async logout(refreshToken?: string) {
+    if (refreshToken) {
+      const tokenDoc = await RefreshToken.findOne({ isRevoked: false })
+      if (tokenDoc && (await tokenDoc.compareToken(refreshToken))) {
+        tokenDoc.isRevoked = true;
+        await tokenDoc.save();
+      }
+    }
+
+    return SuccessRes({ message: "Logged out" });
   }
+
 
   async forgotPassword(email: string) {
     const user = await User.findOne({ email });
     if (!user) {
-      return new NotFoundError("User");
+      throw new NotFoundError("User");
     }
 
     await Otp.deleteMany({ email });
 
     const otp = this.generateOTP();
-    const expiresAt = new Date(Date.now() * 10 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     const hashedOtp = await bcrypt.hash(otp, 12);
 
     await Otp.create({
       email,
       otp: hashedOtp,
       expiresAt,
-      verified: false,
+      isVerified: false,
+      use: "password_reset",
     });
 
     const mailConfig = {
@@ -311,4 +409,122 @@ export class AuthService {
       message: "Password reset mail sent successfully",
     });
   }
+
+  async verifyPasswordResetOtp(email: string, otp: string) {
+    const otpMatch = await Otp.findOne({
+      email,
+      isVerified: false,
+      use: "password_reset",
+    });
+    if (!otpMatch) {
+      throw new NotFoundError("OTP");
+    }
+
+    if (otpMatch.expiresAt < new Date()) {
+      await otpMatch.deleteOne();
+      throw new ValidationError("Invalid or expired otp");
+    }
+
+    const isOtpValid = await bcrypt.compare(otp, otpMatch.otp);
+    if (!isOtpValid) {
+      throw new ValidationError("Invalid or expired otp");
+    }
+
+    otpMatch.isVerified = true;
+    await otpMatch.save();
+
+    return SuccessRes({
+      message: "Otp verified successfully",
+    });
+  }
+
+  async resetPassword(email: string, password: string) {
+    const otpRecord = await Otp.findOne({
+      email,
+      isVerified: true,
+      use: "password_reset",
+    });
+    if (!otpRecord) {
+      throw new NotFoundError("Verify email first");
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      throw new NotFoundError("User");
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+    user.passwordHash = hashedPassword;
+    await user.save();
+
+    await otpRecord.deleteOne({ _id: otpRecord._id });
+    await otpRecord.save();
+
+    const mailConfig = {
+      from: "stuffworks101@gmail.com",
+      to: email,
+      subject: "Shop-It - Password reset successfully",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Password changed successfully</h2>
+        </div>
+      `,
+    };
+
+    await mailer.sendMail(mailConfig);
+    logger.info("Password RESET successfully");
+
+    return SuccessRes({ message: "Password reset successfully" });
+  }
+
+  async changePassword(
+    userId: string,
+    newPassword: string,
+    currentPassword: string
+  ) {
+    const user = await User.findOne({ _id: userId }).select("+passwordHash");
+    if (!user) {
+      throw new NotFoundError("User");
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.passwordHash
+    );
+    if (!isPasswordValid) {
+      throw new ValidationError("Invalid Password");
+    }
+
+    const isSamePassword = await bcrypt.compare(newPassword, currentPassword);
+    if (isSamePassword) {
+      throw new ConflictError("Passwords are already same");
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 12);
+    user.passwordHash = newPasswordHash;
+    await user.save();
+
+    const mailConfig = {
+      from: "stuffworks101@gmail.com",
+      to: user.email,
+      subject: "Shop-It - Password changed successfully",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Password changed successfully</h2>
+        </div>
+      `,
+    };
+
+    await mailer.sendMail(mailConfig);
+    logger.info("Password CHANGED successfully");
+
+    return SuccessRes({ message: "Password changed successfully" });
+  }
+
+  async updateProfile() {
+    return;
+  }
 }
+
+const authService = new AuthService();
+export default authService;

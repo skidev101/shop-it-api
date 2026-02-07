@@ -11,7 +11,12 @@ export interface LoginPayload {
   password: string;
 }
 
-export interface TokenPayload {
+export interface AccessTokenPayload {
   userId: string;
   email: string;
+}
+
+export interface RefreshTokenPayload {
+  userId: string;
+  jti: string
 }

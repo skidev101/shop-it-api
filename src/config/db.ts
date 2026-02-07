@@ -1,12 +1,13 @@
 import mongoose from "mongoose";
 import { env } from "./env";
+import { logger } from "../lib/logger";
 
-const connectDB = async (): Promise<void> => {
+export const connectDB = async (): Promise<void> => {
   try {
     await mongoose.connect(env.DATABASE_URI);
-    console.log("Database connected");
+    logger.info("Database connected");
   } catch (err) {
-    console.log("Database connection error:", err);
+    logger.error(`Database connection failed ${err}`);
     process.exit(1);
   }
 };
@@ -18,5 +19,3 @@ mongoose.connection.on("error", (err) => {
 mongoose.connection.on("disconnected", () => {
   console.warn("Database disconnected");
 });
-
-export default { connectDB };

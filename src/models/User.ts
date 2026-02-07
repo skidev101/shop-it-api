@@ -17,6 +17,7 @@ export interface IUser extends Document {
     zipCode: string;
     isDefault: boolean;
   }[];
+  isSuspended: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -68,7 +69,10 @@ const UserSchema = new Schema<IUser>(
     },
     role: {
       type: String,
-      enum: ["customer", "admin", "vendor"],
+      enum: {
+         values: ["customer", "admin", "vendor"],
+         message: "{VALUE} is not a valid role"
+      },
       default: "customer"
     },
     phoneNumber: {
@@ -84,12 +88,17 @@ const UserSchema = new Schema<IUser>(
       trim: true,
       default: "Africa/Lagos",
     },
-    addresses: [AddressSchema]
+    addresses: [AddressSchema],
+    isSuspended: {
+      type: Boolean,
+      required: true,
+      default: false
+    }
   },
   { timestamps: true }
 );
 
 
-UserSchema.index({ email: 1 });
+// UserSchema.index({ email: 1 });
 
 export const User = model<IUser>("User", UserSchema)

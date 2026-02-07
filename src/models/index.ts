@@ -8,5 +8,6 @@ export { Order, IOrder } from "./Order";
 export { Otp, IOtp } from "./Otp";
 export { Payment, IPayment } from "./Payment";
 export { Product, IProduct } from "./Product";
+export { RefreshToken, IRefreshToken } from "./RefreshToken";
 export { Review, IReview } from "./Review";
 export { Wishlist, IWishlist } from "./Wishlist";
