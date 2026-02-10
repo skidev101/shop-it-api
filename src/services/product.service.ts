@@ -71,22 +71,40 @@ export class ProductService {
       const productData = product.toObject();
 
       return {
-        id: product._id,
-        name: product.name,
-        slug: product.slug,
-        description: product.description,
-        stock: product.stock,
-        price: product.price,
-        comparePrice: product.comparePrice,
-        category: product.category,
-        images: product.images,
-        variants: product.variants,
-        specifications: product.specifications,
-        isActive: product.isActive,
-        isFeatured: product.isFeatured,
-        tags: product.tags,
-        createdAt: product.createdAt
+        id: productData._id,
+        name: productData.name,
+        slug: productData.slug,
+        description: productData.description,
+        stock: productData.stock,
+        price: productData.price,
+        comparePrice: productData.comparePrice,
+        category: productData.category,
+        images: productData.images,
+        variants: productData.variants,
+        specifications: productData.specifications,
+        isActive: productData.isActive,
+        isFeatured: productData.isFeatured,
+        tags: productData.tags,
+        createdAt: productData.createdAt
       }
+    });
+
+    return SuccessRes({
+      message: "Products fetched",
+      data: {
+        products: formattedResponse,
+        total: productsCount
+      },
+      statusCode: 200
     })
+  }
+
+  async getProduct(id: string) {
+    const product = await Product.findOne({ _id: id });
+    if (!product) {
+      throw new NotFoundError("Product not found");
+    }
+
+    
   }
 }
