@@ -1,15 +1,34 @@
+import mongoose from "mongoose";
 import { IProduct, Product, User } from "../models";
 import { ProductPayload } from "../types/product";
 import { NotFoundError, UnauthorizedError } from "../utils/api-errors";
 import { SuccessRes } from "../utils/responses";
+import slugify from "slugify";
 
 export interface ProductQuery {
-  page: number;
-  limit: number;
-  isFeatured: true;
+  page?: number;
+  limit?: number;
+  isFeatured?: boolean;
+  category?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  search?: string;
+  sort?: "price_asc" | "price_desc" | "newest";
 }
 
 export class ProductService {
+  private async generateUniqueSlug(name: string) {
+    let baseSlug = slugify(name, { lower: true, strict: true });
+    let slug = baseSlug;
+    let counter = 1;
+
+    while (await Product.findOne({ slug })) {
+      slug = `${counter}-${counter++}`;
+    }
+
+    return slug;
+  }
+
   async createProduct(data: ProductPayload, userId: string) {
     const user = await User.findOne({ userId });
     if (!user) {
@@ -21,16 +40,17 @@ export class ProductService {
     }
 
     if (user.isSuspended) {
-      throw new UnauthorizedError("User cannot perform this operation");
+      throw new UnauthorizedError("User account suspended");
     }
+
+    const slug = await this.generateUniqueSlug(data.name);
 
     const product = await Product.create({
       uploadedBy: user._id,
       name: data.name,
-      slug: "hello",
+      slug,
       description: data.description,
-      stock: data.stock,
-      price: data.price,
+      basePrice: data.price,
       comparePrice: data.comparePrice,
       category: data.category,
       images: data.images,
@@ -51,21 +71,51 @@ export class ProductService {
   }
 
   async getProducts(query: ProductQuery) {
-    const page = query.page || 1;
-    const limit = query.limit || 10;
-    const skip = (page - 1) * limit;
+    const {
+      page = 1,
+      limit = 10,
+      category,
+      minPrice,
+      maxPrice,
+      search,
+      isFeatured,
+      sort = "newest",
+    } = query;
 
-    const filter: any = {};
-    if (query.isFeatured) {
-      filter.isFeatured = query.isFeatured;
+    const filter: any = {
+      isActive: true,
+    };
+
+    if (category) {
+      filter.category = new mongoose.Types.ObjectId(category)
+    }
+
+    if (typeof isFeatured === "boolean") {
+      filter.isFeatured = isFeatured;
+    }
+
+    if (minPrice || maxPrice) {
+      filter.basePrice = {}
+      if (minPrice) filter.basePrice.$gte = minPrice
+      if (maxPrice) filter.basePrice.$lte = maxPrice
+    }
+
+    if (search) {
+      filter.$text = { $search: search }
+    }
+
+    const sortMap: any = {
+      newest: { createdAt: -1 },
+      price_asc: { basePrice: 1 },
+      price_desc: { basePrice: -1 }
     }
 
     const products = await Product.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
+      .sort(sortMap[sort])
+      .skip((page - 1) * limit)
       .limit(limit);
 
-    const productsCount = await Product.countDocuments(filter);
+    const total = await Product.countDocuments(filter);
 
     const formattedResponse = products.map((product: IProduct) => {
       const productData = product.toObject();
@@ -85,26 +135,31 @@ export class ProductService {
         isActive: productData.isActive,
         isFeatured: productData.isFeatured,
         tags: productData.tags,
-        createdAt: productData.createdAt
-      }
+        createdAt: productData.createdAt,
+      };
     });
 
     return SuccessRes({
       message: "Products fetched",
       data: {
         products: formattedResponse,
-        total: productsCount
+        total,
+        page,
+        pages: Math.ceil(total / limit)
       },
-      statusCode: 200
-    })
+      statusCode: 200,
+    });
   }
 
-  async getProduct(id: string) {
-    const product = await Product.findOne({ _id: id });
+  async getProductBySlug(slug: string) {
+    const product = await Product.findOne({ slug, isActive: true })
+      .populate("category")
+      .populate("uploadedBy", "name email")
+
     if (!product) {
       throw new NotFoundError("Product not found");
     }
 
-    
+    return product
   }
 }

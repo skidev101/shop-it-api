@@ -13,7 +13,12 @@ import {
 import mailer from "../config/mailer";
 import { logger } from "../lib/logger";
 import { SuccessRes } from "../utils/responses";
-import { LoginPayload, RegisterPayload, AccessTokenPayload, RefreshTokenPayload } from "../types/auth";
+import {
+  LoginPayload,
+  RegisterPayload,
+  AccessTokenPayload,
+  RefreshTokenPayload,
+} from "../types/auth";
 
 export class AuthService {
   private generateOTP = (): string => {
@@ -132,7 +137,7 @@ export class AuthService {
     };
     const refreshPayload = {
       userId: user._id.toString(),
-      jti: newJti
+      jti: newJti,
     };
     const newAccessToken = this.generateAccessToken(accessPayload);
     const newRefreshToken = this.generateRefreshToken(refreshPayload);
@@ -178,7 +183,7 @@ export class AuthService {
     };
     const refreshPayload = {
       userId: user._id.toString(),
-      jti: newJti
+      jti: newJti,
     };
     const newAccessToken = this.generateAccessToken(accessPayload);
     const newRefreshToken = this.generateRefreshToken(refreshPayload);
@@ -186,6 +191,7 @@ export class AuthService {
 
     await RefreshToken.create({
       userId: user._id,
+      jti: newJti,
       tokenHash: newRefreshTokenHash,
       userAgent,
       ip,
@@ -203,74 +209,41 @@ export class AuthService {
     });
   }
 
-  // try {
-  //   const decodedToken = jwt.verify(
-  //     refreshToken,
-  //     env.JWT_REFRESH_SECRET
-  //   ) as TokenPayload;
-
-  //   const isInBlacklist = await TokenBlacklist.findOne({
-  //     token: refreshToken,
-  //   });
-  //   if (isInBlacklist) {
-  //     throw new ForbiddenError("Expired token");
-  //   }
-
-  //   const user = await User.findById(decodedToken.userId);
-  //   if (!user) {
-  //     throw new NotFoundError("User not found");
-  //   }
-
-  //   const newTokens = this.generateTokens({
-  //     userId: user._id.toString(),
-  //     email: user.email,
-  //   });
-
-  //   const decoded = jwt.decode(refreshToken) as jwt.JwtPayload;
-  //   console.log("decoded token:", decoded);
-  //   if (decoded?.exp) {
-  //     await TokenBlacklist.create({
-  //       token: refreshToken,
-  //       expiresAt: new Date(decoded.exp * 1000),
-  //     });
-
-  //     console.log("created new blacklist token");
-  //   }
-
-  //   return SuccessRes({
-  //     message: "Token refreshed successfully",
-  //     data: newTokens,
-  //   });
-  // } catch (error) {
-  //   if (error instanceof jwt.JsonWebTokenError) throw new UnauthorizedError("Invalid refresh token");
-  //   throw error;
-  // }
+ 
   async refreshToken(token: string, userAgent?: string, ip?: string) {
     let payload: { userId: string; jti: string };
 
     try {
-      payload = jwt.verify(token, env.JWT_REFRESH_SECRET) as { userId: string; jti: string };
+      payload = jwt.verify(token, env.JWT_REFRESH_SECRET) as {
+        userId: string;
+        jti: string;
+      };
     } catch (error) {
-      console.error("Error refreshing token", error)
-      throw new UnauthorizedError("Invalid or expired refresh token")
+      console.error("Error refreshing token", error);
+      throw new UnauthorizedError("Invalid or expired refresh token");
     }
 
-    const tokenDoc = await RefreshToken.findOne({ 
+    const tokenDoc = await RefreshToken.findOne({
       jti: payload.jti,
-      isRevoked: false
+      isRevoked: false,
     });
 
     if (!tokenDoc) {
       await RefreshToken.updateMany(
         { userId: payload.userId },
         { isRevoked: true }
-      )
-      throw new UnauthorizedError("Refresh tokens revoked")
+      );
+      logger.warn(
+        `Security breach detected. All sessions revoked for user: ${payload.userId}`
+      );
+      throw new UnauthorizedError(
+        "Security breach detected. All sessions revoked"
+      );
     }
 
     const isValid = await bcrypt.compare(token, tokenDoc.tokenHash);
     if (!isValid) {
-      throw new UnauthorizedError("Refresh token mismatch")
+      throw new UnauthorizedError("Refresh token mismatch");
     }
 
     tokenDoc.isRevoked = true;
@@ -288,12 +261,12 @@ export class AuthService {
     };
     const refreshPayload = {
       userId: user._id.toString(),
-      jti: newJti
+      jti: newJti,
     };
     const newAccessToken = this.generateAccessToken(accessPayload);
     const newRefreshToken = this.generateRefreshToken(refreshPayload);
     const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 12);
-    
+
     await RefreshToken.create({
       userId: user._id,
       jti: newJti,
@@ -309,63 +282,38 @@ export class AuthService {
     });
   }
 
-  // async logout(accessToken: string, refreshToken?: string) {
-  //   if (!accessToken || accessToken.trim() === "") {
-  //     throw new ValidationError("Access token is required");
-  //   }
-
-  //   const decodedAccessToken = jwt.decode(accessToken) as jwt.JwtPayload;
-  //   const decodedRefreshToken = refreshToken
-  //     ? (jwt.decode(refreshToken) as jwt.JwtPayload)
-  //     : null;
-
-  //   if (!decodedAccessToken) {
-  //     throw new ValidationError("Invalid access token");
-  //   }
-
-  //   if (decodedAccessToken.exp) {
-  //     const isBlacklisted = await TokenBlacklist.findOne({
-  //       token: accessToken,
-  //     });
-
-  //     if (!isBlacklisted) {
-  //       await TokenBlacklist.create({
-  //         token: accessToken,
-  //         expiresAt: new Date(decodedAccessToken.exp * 1000),
-  //       });
-  //     }
-  //   }
-
-  //   if (refreshToken && decodedRefreshToken?.exp) {
-  //     const isBlacklisted = await TokenBlacklist.findOne({
-  //       token: refreshToken,
-  //     });
-
-  //     if (!isBlacklisted) {
-  //       await TokenBlacklist.create({
-  //         token: refreshToken,
-  //         expiresAt: new Date(decodedRefreshToken.exp * 1000),
-  //       });
-  //     }
-  //   }
-
-  //   return SuccessRes({
-  //     message: "Logged out successfully",
-  //   });
-  // }
-
   async logout(refreshToken?: string) {
-    if (refreshToken) {
-      const tokenDoc = await RefreshToken.findOne({ isRevoked: false })
-      if (tokenDoc && (await tokenDoc.compareToken(refreshToken))) {
-        tokenDoc.isRevoked = true;
-        await tokenDoc.save();
+    if (!refreshToken) {
+      return SuccessRes({ message: "Logged out" });
+    }
+
+    try {
+      const payload = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as {
+        userId: string;
+        jti: string;
+      };
+      const result = await RefreshToken.findOneAndUpdate(
+        { jti: payload.jti, isRevoked: false },
+        { $set: { isRevoked: true } },
+        { new: true }
+      );
+      if (!result) {
+        logger.warn(
+          `Logout attempted on missing or already revoked JTI: ${payload.jti}`
+        );
+        console.warn(
+          `Logout attempted on missing or already revoked JTI: ${payload.jti}`
+        );
       }
+    } catch (err) {
+      if (err instanceof Error) {
+        console.error("jwt logout verification error:", err.message);
+      }
+      console.error("jwt logout error");
     }
 
     return SuccessRes({ message: "Logged out" });
   }
-
 
   async forgotPassword(email: string) {
     const user = await User.findOne({ email });

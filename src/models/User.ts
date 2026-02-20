@@ -23,27 +23,27 @@ export interface IUser extends Document {
 }
 
 const AddressSchema = new Schema({
-  street:{
+  street: {
     type: String,
-    required: true
+    required: true,
   },
   city: {
     type: String,
-    required: true
+    required: true,
   },
   country: {
     type: String,
-    required: true
+    required: true,
   },
   zipCode: {
     type: String,
-    required: true
+    required: true,
   },
   isDefault: {
     type: Boolean,
-    default: false
-  }
-})
+    default: false,
+  },
+});
 
 const UserSchema = new Schema<IUser>(
   {
@@ -70,10 +70,10 @@ const UserSchema = new Schema<IUser>(
     role: {
       type: String,
       enum: {
-         values: ["customer", "admin", "vendor"],
-         message: "{VALUE} is not a valid role"
+        values: ["customer", "admin", "vendor"],
+        message: "{VALUE} is not a valid role",
       },
-      default: "customer"
+      default: "customer",
     },
     phoneNumber: {
       type: String,
@@ -81,7 +81,7 @@ const UserSchema = new Schema<IUser>(
     },
     isVerified: {
       type: Boolean,
-      default: false
+      default: false,
     },
     timezone: {
       type: String,
@@ -92,13 +92,28 @@ const UserSchema = new Schema<IUser>(
     isSuspended: {
       type: Boolean,
       required: true,
-      default: false
-    }
+      default: false,
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: {
+      transform: (doc, ret: any) => {
+        delete ret.passwordHash;
+        delete ret.__v;
+        return ret;
+      },
+    },
+    toObject: {
+      transform: (doc, ret: any) => {
+        delete ret.passwordHash;
+        delete ret.__v;
+        return ret;
+      },
+    },
+  }
 );
-
 
 // UserSchema.index({ email: 1 });
 
-export const User = model<IUser>("User", UserSchema)
+export const User = model<IUser>("User", UserSchema);
