@@ -1,0 +1,50 @@
+├── .env
+├── .gitignore
+├── index.ts
+├── logs
+   ├── combined.log
+   └── error.log
+├── package.json
+├── pnpm-lock.yaml
+├── src
+   ├── config
+      ├── db.ts
+      ├── env.ts
+      └── mailer.ts
+   ├── controllers
+      └── auth.controller.ts
+   ├── lib
+      └── logger.ts
+   ├── middlewares
+      ├── auth.ts
+      ├── errorHandler.ts
+      ├── rateLimiter.ts
+      └── requestLogger.ts
+   ├── models
+      ├── Cart.ts
+      ├── Category.ts
+      ├── Coupon.ts
+      ├── Order.ts
+      ├── Otp.ts
+      ├── Payment.ts
+      ├── Product.ts
+      ├── RefreshToken.ts
+      ├── Review.ts
+      ├── User.ts
+      ├── Wishlist.ts
+      └── index.ts
+   ├── routes
+      ├── auth.ts
+      ├── index.ts
+      └── product.ts
+   ├── services
+      ├── auth.service.ts
+      └── product.service.ts
+   ├── types
+      ├── auth.ts
+      ├── product.ts
+      └── user.ts
+   └── utils
+      ├── api-errors.ts
+      └── responses.ts
+└── tsconfig.json

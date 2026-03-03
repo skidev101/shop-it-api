@@ -45,13 +45,12 @@ export class ProductService {
 
     const slug = await this.generateUniqueSlug(data.name);
 
-    const product = await Product.create({
+    const productData: any = {
       uploadedBy: user._id,
       name: data.name,
       slug,
       description: data.description,
       basePrice: data.price,
-      comparePrice: data.comparePrice,
       category: data.category,
       images: data.images,
       variants: data.variants,
@@ -59,7 +58,13 @@ export class ProductService {
       isActive: true,
       isFeatured: false,
       tags: data.tags,
-    });
+    };
+
+    if (data.comparePrice !== undefined) {
+      productData.comparePrice = data.comparePrice;
+    }
+
+    const product = await Product.create(productData);
 
     return SuccessRes({
       message: "New Product added",
