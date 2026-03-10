@@ -1,55 +1,31 @@
-import swaggerJsdoc from "swagger-jsdoc";
+import swaggerJsdoc from 'swagger-jsdoc';
 
 const options: swaggerJsdoc.Options = {
   definition: {
-    openapi: "3.0.0",
+    openapi: '3.0.0',
     info: {
-      title: "Ecommerce API",
-      version: "1.0.0",
-      description: "REST API documentation for the Ecommerce platform",
+      title: 'ShopIt API Documentation',
+      version: '1.0.0',
+      description: 'The complete API documentation for the ShopIt e-commerce backend',
     },
     servers: [
       {
-        url: "http://localhost:3000",
+        url: 'http://localhost:5000',
+        description: 'Development server',
       },
     ],
     components: {
       securitySchemes: {
-        bearerAuth: {
-          type: "http",
-          scheme: "bearer",
-          bearerFormat: "JWT",
-        },
-      },
-      schemas: {
-        User: {
-          type: "object",
-          properties: {
-            id: { type: "string" },
-            email: { type: "string" },
-            role: { type: "string" },
-          },
-        },
-        Product: {
-          type: "object",
-          required: ["name", "price"],
-          properties: {
-            id: { type: "string" },
-            name: { type: "string" },
-            description: { type: "string" },
-            price: { type: "number" },
-            stock: { type: "integer" },
-          },
+        cookieAuth: {      // Since we switched to Cookies!
+          type: 'apiKey',
+          in: 'cookie',
+          name: 'accessToken',
         },
       },
     },
-    security: [
-      {
-        bearerAuth: [],
-      },
-    ],
   },
-  apis: ["src/routes/*.ts"], // Scan route files
+  // Path to the API docs (where you'll write the JSDoc comments)
+  apis: ['./src/routes/*.ts', './src/controllers/*.ts'], 
 };
 
-export const swaggerSpec = swaggerJsdoc(options);
+export const swaggerSpecs = swaggerJsdoc(options);
