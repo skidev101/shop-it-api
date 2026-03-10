@@ -49,7 +49,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
-  const userAgent = req.headers["user-agent"] ?? "unknown";
+  const userAgent = req.headers["user-agent"] ?? "unknown"; // default to unknown if user-agent header is missing
   const ip = req.ip ?? "unknown";
 
   const result = await authService.login({ ...req.body }, { userAgent, ip });
