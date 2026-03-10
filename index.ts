@@ -13,16 +13,17 @@ import {
   notFoundHandler,
 } from "./src/middlewares/errorHandler.middleware";
 import { connectDB } from "./src/config/db";
-import swaggerUi from "swagger-ui-express";
+import helmet from "helmet"; 
+import morgan from "morgan";
+import compression from "compression";
 
 const app: Express = express();
 const PORT = env.PORT;
 const API_VERSION = env.API_VERSION;
 
-app.use((_req: Request, res: Response, next: NextFunction) => {
-  res.setHeader("X-Powered-By", "shop-it API");
-  next();
-});
+app.disable("x-powered-by");
+
+app.use(helmet());
 
 app.use(
   cors({
@@ -32,8 +33,16 @@ app.use(
     credentials: true,
   }),
 );
+
+if (!env.IS_PROD) {
+  app.use(morgan("dev"));
+}
+
+app.use(compression());
+
 app.set("trust proxy", 1); // Trust first proxy for secure cookies behind proxies/load balancers
-app.use(express.json({ limit: "1mb" }));
+
+app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
@@ -44,13 +53,19 @@ app.use(`/api/${API_VERSION}/`, router);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  connectDB()
-    .then(() => {
-      const env_label = env.IS_PROD ? "PRODUCTION" : "DEVELOPMENT";
-      logger.info(`[${env_label}]: Server listening on ${PORT}`);
-    })
-    .catch((e) => {
-      console.error("Database connection error:", e);
+async function startServer() {
+  try {
+    await connectDB();
+
+    app.listen(PORT, () => {
+      const envLabel = env.IS_PROD ? "PRODUCTION" : "DEVELOPMENT";
+      logger.info(`[${envLabel}] Server running on port ${PORT}`);
     });
-});
+
+  } catch (error) {
+    logger.error("Server failed to start", error);
+    process.exit(1);
+  }
+}
+
+startServer();
