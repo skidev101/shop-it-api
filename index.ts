@@ -14,7 +14,6 @@ import {
 } from "./src/middlewares/errorHandler.middleware";
 import { connectDB } from "./src/config/db";
 import swaggerUi from "swagger-ui-express";
-import { swaggerSpecs } from "./src/config/swagger";
 
 const app: Express = express();
 const PORT = env.PORT;
@@ -41,10 +40,6 @@ app.use(cookieParser());
 app.use(requestLogger);
 
 app.use(`/api/${API_VERSION}/`, router);
-
-if (process.env.NODE_ENV !== "production") {
-  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
-}
 
 app.use(notFoundHandler);
 app.use(errorHandler);
