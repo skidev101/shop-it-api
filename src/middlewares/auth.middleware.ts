@@ -13,23 +13,25 @@ export interface AuthRequest extends Request {
 export const authenticate = async (
   req: AuthRequest,
   _res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
-  const authHeader = req.headers.authorization;
+  const token = req.cookies?.accessToken;
 
-  if (!authHeader?.startsWith("Bearer ")) {
-    throw new UnauthorizedError("No token provided");
+  if (!token) {
+    throw new UnauthorizedError("No token provided. Login to get access");
   }
 
-  const token = authHeader.split(" ")[1];
   try {
-    const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as {
+    const payload = jwt.verify(token, env.JWT_ACCESS_SECRET || "") as {
       userId: string;
       email: string;
       jti: string;
     };
 
-    req.user = payload;
+    req.user = {
+      userId: payload.userId,
+      email: payload.email,
+    };
     next();
   } catch (error) {
     throw new UnauthorizedError("Invalid or expired token");

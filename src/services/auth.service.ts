@@ -100,12 +100,12 @@ export class AuthService {
   }
 
   async register(data: RegisterPayload) {
-    const isVerified = await Otp.findOne({
+    const isOtpVerified = await Otp.findOne({
       email: data.email,
       use: "email_verification",
       isVerified: true,
     });
-    if (!isVerified) {
+    if (!isOtpVerified) {
       throw new UnauthorizedError("Email not verified");
     }
 
@@ -126,7 +126,7 @@ export class AuthService {
       timezone: "Africa/Lagos",
     });
 
-    await Otp.deleteOne({ _id: isVerified._id });
+    await Otp.deleteOne({ _id: isOtpVerified._id });
     user.isVerified = true;
     await user.save();
 
@@ -153,16 +153,16 @@ export class AuthService {
       message: "Registeration successful",
       data: {
         user: user.toObject(),
-        newAccessToken,
-        newRefreshToken,
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
       },
       statusCode: 201,
     });
   }
 
-  async login(data: LoginPayload, userAgent?: string, ip?: string) {
+  async login(data: LoginPayload, metadata: { userAgent: string; ip: string }) {
     const user = await User.findOne({ email: data.email }).select(
-      "+passwordHash"
+      "+passwordHash",
     );
     if (!user) {
       throw new NotFoundError("User");
@@ -170,10 +170,14 @@ export class AuthService {
 
     const isPasswordValid = await bcrypt.compare(
       data.password,
-      user.passwordHash
+      user.passwordHash,
     );
     if (!isPasswordValid) {
       throw new ValidationError("Invalid credentials");
+    }
+
+    if (user.isVerified === false) {
+      throw new ForbiddenError("Email not verified");
     }
 
     const newJti = uuidv4();
@@ -193,8 +197,8 @@ export class AuthService {
       userId: user._id,
       jti: newJti,
       tokenHash: newRefreshTokenHash,
-      userAgent,
-      ip,
+      userAgent: metadata.userAgent,
+      ip: metadata.ip,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
 
@@ -202,14 +206,13 @@ export class AuthService {
       message: "Login successful",
       data: {
         user: user.toObject(),
-        newAccessToken,
-        newRefreshToken,
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
       },
       statusCode: 200,
     });
   }
 
- 
   async refreshToken(token: string, userAgent?: string, ip?: string) {
     let payload: { userId: string; jti: string };
 
@@ -231,13 +234,13 @@ export class AuthService {
     if (!tokenDoc) {
       await RefreshToken.updateMany(
         { userId: payload.userId },
-        { isRevoked: true }
+        { isRevoked: true },
       );
       logger.warn(
-        `Security breach detected. All sessions revoked for user: ${payload.userId}`
+        `Security breach detected. All sessions revoked for user: ${payload.userId}`,
       );
       throw new UnauthorizedError(
-        "Security breach detected. All sessions revoked"
+        "Security breach detected. All sessions revoked",
       );
     }
 
@@ -295,14 +298,15 @@ export class AuthService {
       const result = await RefreshToken.findOneAndUpdate(
         { jti: payload.jti, isRevoked: false },
         { $set: { isRevoked: true } },
-        { new: true }
+        { new: true },
       );
+
       if (!result) {
         logger.warn(
-          `Logout attempted on missing or already revoked JTI: ${payload.jti}`
+          `Logout attempted on missing or already revoked JTI: ${payload.jti}`,
         );
         console.warn(
-          `Logout attempted on missing or already revoked JTI: ${payload.jti}`
+          `Logout attempted on missing or already revoked JTI: ${payload.jti}`,
         );
       }
     } catch (err) {
@@ -386,7 +390,11 @@ export class AuthService {
     });
   }
 
-  async resetPassword(email: string, password: string) {
+  async resetPassword(
+    email: string,
+    password: string,
+    metadata: { userAgent: string; ip: string },
+  ) {
     const otpRecord = await Otp.findOne({
       email,
       isVerified: true,
@@ -405,8 +413,29 @@ export class AuthService {
     user.passwordHash = hashedPassword;
     await user.save();
 
+    await RefreshToken.deleteMany({ _id: user._id });
+
     await otpRecord.deleteOne({ _id: otpRecord._id });
-    await otpRecord.save();
+
+    const newJti = uuidv4();
+    const accessToken = this.generateAccessToken({
+      userId: user._id.toString(),
+      email: user.email,
+    });
+    const refreshToken = this.generateRefreshToken({
+      userId: user._id.toString(),
+      jti: newJti,
+    });
+
+    const newRefreshTokenHash = await bcrypt.hash(refreshToken, 12);
+    await RefreshToken.create({
+      userId: user._id,
+      jti: newJti,
+      tokenHash: newRefreshTokenHash,
+      userAgent: metadata.userAgent,
+      ip: metadata.ip,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
 
     const mailConfig = {
       from: "stuffworks101@gmail.com",
@@ -419,16 +448,21 @@ export class AuthService {
       `,
     };
 
-    await mailer.sendMail(mailConfig);
+    await mailer
+      .sendMail(mailConfig)
+      .catch((err) => logger.error("Email send failed", err));
     logger.info("Password RESET successfully");
 
-    return SuccessRes({ message: "Password reset successfully" });
+    return SuccessRes({
+      message: "Password reset successfully",
+      data: { user: user.toObject(), accessToken, refreshToken },
+    });
   }
 
   async changePassword(
     userId: string,
     newPassword: string,
-    currentPassword: string
+    currentPassword: string,
   ) {
     const user = await User.findOne({ _id: userId }).select("+passwordHash");
     if (!user) {
@@ -437,7 +471,7 @@ export class AuthService {
 
     const isPasswordValid = await bcrypt.compare(
       currentPassword,
-      user.passwordHash
+      user.passwordHash,
     );
     if (!isPasswordValid) {
       throw new ValidationError("Invalid Password");

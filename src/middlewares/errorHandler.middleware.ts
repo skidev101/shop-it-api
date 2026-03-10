@@ -9,9 +9,9 @@ interface ErrorResponse {
   status: 'error';
   statusCode: number;
   message: string;
-  code?: string;
+  code?: string | undefined;
   details?: any;
-  stack?: string;
+  stack?: string | undefined;
 }
 
 export const errorHandler = (

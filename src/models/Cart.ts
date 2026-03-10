@@ -1,9 +1,8 @@
-import { model, Schema, Types } from "mongoose";
+import { model, Schema, Types, Document } from "mongoose";
 
 
 
 export interface ICart extends Document {
-  _id: Types.ObjectId;
   userId: Types.ObjectId;
   items: [{
     productId: Types.ObjectId,
