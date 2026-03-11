@@ -8,8 +8,8 @@ import "../docs/paths/product.doc";
 export const setupSwagger = (app: Express) => {
   const docs = generateDocs();
 
-  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(docs));
-  app.get("/docs.json", (req, res) => {
+  app.use("/api/v1/docs", swaggerUi.serve, swaggerUi.setup(docs));
+  app.get("/api/v1/docs.json", (req, res) => {
     res.json(docs);
   });
 };

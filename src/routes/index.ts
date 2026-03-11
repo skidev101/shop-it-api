@@ -1,8 +1,6 @@
 import { Router, Request, Response } from "express";
 import authRoutes from "./auth"
 import swaggerUi from "swagger-ui-express";
-import { generateSwaggerSpec } from "../config/swagger";
-
 const router: Router = Router()
 
 
@@ -22,9 +20,6 @@ router.get("/health", (_req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
   })
 });
-
-router.use("/docs", swaggerUi.serve);
-router.get("/docs", swaggerUi.setup(generateSwaggerSpec()));
 
 router.use("/auth", authRoutes);
 router.use("/product", authRoutes);

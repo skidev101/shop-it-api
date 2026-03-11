@@ -89,7 +89,7 @@ export class ProductService {
         await CloudinaryUtil.deleteMultipleFiles(publicIds);
       }
 
-      throw error; // re-throw the original error after cleanup
+      throw error;
     }
   }
 
