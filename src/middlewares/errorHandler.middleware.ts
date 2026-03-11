@@ -5,6 +5,7 @@ import { ApiError, NotFoundError } from '../utils/api-errors';
 import mongoose from 'mongoose';
 import { logger } from '../lib/logger';
 import z from 'zod';
+import multer from "multer";
 
 interface ErrorResponse {
   status: 'error';
@@ -31,6 +32,15 @@ export const errorHandler = (
     }))
     error = new ApiError(400, "validation failed", true, "VALIDATION_ERROR");
     (error as any).details = details
+  }
+
+  if (err instanceof multer.MulterError) {
+    const details = {
+      field: err.field,
+      message: err.message,
+    }
+    error = new ApiError(400, err.message, true, "FILE_UPLOAD_ERROR");
+    (error as any).details = details;
   }
 
   // Handle Mongoose validation errors

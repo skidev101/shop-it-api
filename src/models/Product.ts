@@ -17,7 +17,7 @@ export interface IProduct extends Document {
   basePrice: number;
   comparePrice?: number;
   category: Types.ObjectId;
-  images: string[];
+  images: Array<{ url: string; public_id: string }>;
   variants?: IProductVariant[];
   specifications: Record<string, string>;
   tags: string[];
@@ -49,7 +49,12 @@ const variantSchema = new Schema<IProductVariant>({
     required: true,
     min: 0,
   },
-  image: String,
+  image: [
+    {
+      url: { type: String, required: true },
+      public_id: { type: String, required: true },
+    },
+  ],
   isActive: {
     type: Boolean,
     default: true,
@@ -96,7 +101,12 @@ const ProductSchema = new Schema<IProduct>(
       index: true,
     },
     images: {
-      type: [String],
+      type: [
+        {
+          url: { type: String, required: true },
+          public_id: { type: String, required: true },
+        },
+      ],
       required: true,
     },
     variants: {
@@ -130,9 +140,12 @@ const ProductSchema = new Schema<IProduct>(
       default: 0,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-ProductSchema.index({ name: "text", description: "text", tags: "text" }, { weights: { name: 10, description: 2 }})
+ProductSchema.index(
+  { name: "text", description: "text", tags: "text" },
+  { weights: { name: 10, description: 2 } },
+);
 
 export const Product = model<IProduct>("Product", ProductSchema);

@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { register } from "../controllers/auth.controller";
+import { createProduct } from "../controllers/product.controller";
+import { upload } from "../config/cloudinary";
 
 const router: Router = Router();
 
-router.post("/new", register);
+router.post("/", upload.array("images", 5), createProduct);
 
 export default router;

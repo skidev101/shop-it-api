@@ -4,6 +4,8 @@ import { ProductPayload } from "../types/product";
 import { NotFoundError, UnauthorizedError } from "../utils/api-errors";
 import { SuccessRes } from "../utils/responses";
 import slugify from "slugify";
+import { logger } from "../lib/logger";
+import { deleteFromCloudinary } from "../utils/cloudinary";
 
 export interface ProductQuery {
   page?: number;
@@ -33,50 +35,60 @@ export class ProductService {
     return slug;
 }
 
-  async createProduct(data: ProductPayload, userId: string) {
+  async createProduct(data: ProductPayload, userId: string, files: Express.Multer.File[]) {
     const user = await User.findOne({ userId });
-    if (!user) {
-      throw new NotFoundError("User");
+    if (!user) throw new NotFoundError("User");
+    if (!user.isVerified) throw new UnauthorizedError("User account not verified");
+    if (user.isSuspended) throw new UnauthorizedError("User account suspended");
+
+    const imageObjects = files.map((file) => ({
+      url: file.path,
+      public_id: file.filename
+    }))
+
+    try {
+      const slug = await this.generateUniqueSlug(data.name);
+  
+      const productData: any = {
+        uploadedBy: user._id,
+        name: data.name,
+        slug,
+        description: data.description,
+        basePrice: data.price,
+        category: data.category,
+        images: imageObjects,
+        variants: data.variants,
+        specifications: data.specifications,
+        isActive: true,
+        isFeatured: false,
+        tags: data.tags,
+      };
+      
+      if (data.comparePrice !== undefined) {
+        productData.comparePrice = data.comparePrice;
+      }
+  
+      const product = await Product.create(productData);
+
+      return SuccessRes({
+        message: "New Product added",
+        data: {
+          product: product.toObject(),
+        },
+        statusCode: 201,
+      });
+
+    } catch (error: any) {
+      
+      if (imageObjects.length > 0) {
+        logger.error("DB error creating product. Cleaning up images...")
+        await Promise.all(
+          imageObjects.map((img: any) => deleteFromCloudinary(img.public_id))
+        )
+      }
+
+      throw error; // re-throw the original error after cleanup
     }
-
-    if (!user.isVerified) {
-      throw new UnauthorizedError("User account not verified");
-    }
-
-    if (user.isSuspended) {
-      throw new UnauthorizedError("User account suspended");
-    }
-
-    const slug = await this.generateUniqueSlug(data.name);
-
-    const productData: any = {
-      uploadedBy: user._id,
-      name: data.name,
-      slug,
-      description: data.description,
-      basePrice: data.price,
-      category: data.category,
-      images: data.images,
-      variants: data.variants,
-      specifications: data.specifications,
-      isActive: true,
-      isFeatured: false,
-      tags: data.tags,
-    };
-
-    if (data.comparePrice !== undefined) {
-      productData.comparePrice = data.comparePrice;
-    }
-
-    const product = await Product.create(productData);
-
-    return SuccessRes({
-      message: "New Product added",
-      data: {
-        product: product.toObject(),
-      },
-      statusCode: 201,
-    });
   }
 
   async getProducts(query: ProductQuery) {
@@ -172,3 +184,7 @@ export class ProductService {
     return product
   }
 }
+
+
+const productService = new ProductService();
+export default productService;
