@@ -5,7 +5,7 @@ import { NotFoundError, UnauthorizedError } from "../utils/api-errors";
 import { SuccessRes } from "../utils/responses";
 import slugify from "slugify";
 import { logger } from "../lib/logger";
-import { deleteFromCloudinary } from "../utils/cloudinary";
+import { CloudinaryUtil } from "../utils/cloudinary";
 
 export interface ProductQuery {
   page?: number;
@@ -33,22 +33,27 @@ export class ProductService {
     }
 
     return slug;
-}
+  }
 
-  async createProduct(data: ProductPayload, userId: string, files: Express.Multer.File[]) {
+  async createProduct(
+    data: ProductPayload,
+    userId: string,
+    files: Express.Multer.File[],
+  ) {
     const user = await User.findOne({ userId });
     if (!user) throw new NotFoundError("User");
-    if (!user.isVerified) throw new UnauthorizedError("User account not verified");
+    if (!user.isVerified)
+      throw new UnauthorizedError("User account not verified");
     if (user.isSuspended) throw new UnauthorizedError("User account suspended");
 
     const imageObjects = files.map((file) => ({
       url: file.path,
-      public_id: file.filename
-    }))
+      public_id: file.filename,
+    }));
 
     try {
       const slug = await this.generateUniqueSlug(data.name);
-  
+
       const productData: any = {
         uploadedBy: user._id,
         name: data.name,
@@ -63,11 +68,11 @@ export class ProductService {
         isFeatured: false,
         tags: data.tags,
       };
-      
+
       if (data.comparePrice !== undefined) {
         productData.comparePrice = data.comparePrice;
       }
-  
+
       const product = await Product.create(productData);
 
       return SuccessRes({
@@ -77,18 +82,40 @@ export class ProductService {
         },
         statusCode: 201,
       });
-
     } catch (error: any) {
-      
       if (imageObjects.length > 0) {
-        logger.error("DB error creating product. Cleaning up images...")
-        await Promise.all(
-          imageObjects.map((img: any) => deleteFromCloudinary(img.public_id))
-        )
+        logger.error("DB error creating product. Cleaning up images...");
+        const publicIds = imageObjects.map((img: any) => img.public_id);
+        await CloudinaryUtil.deleteMultipleFiles(publicIds);
       }
 
       throw error; // re-throw the original error after cleanup
     }
+  }
+
+
+  async deleteProduct(productId: string, userId: string) {
+    const product = await Product.findOne({
+      _id: productId,
+      uploadedBy: userId,
+    });
+
+    if (!product) {
+      throw new NotFoundError("Product not found or unauthorized");
+    }
+
+    const publicIds = product.images.map((img: any) => img.public_id);
+
+    await Product.findByIdAndDelete(productId);
+
+    if (publicIds.length > 0) {
+      await CloudinaryUtil.deleteMultipleFiles(publicIds);
+    }
+
+    return SuccessRes({
+      message: "Product deleted",
+      statusCode: 200,
+    });
   }
 
   async getProducts(query: ProductQuery) {
@@ -108,7 +135,7 @@ export class ProductService {
     };
 
     if (category) {
-      filter.category = new mongoose.Types.ObjectId(category)
+      filter.category = new mongoose.Types.ObjectId(category);
     }
 
     if (typeof isFeatured === "boolean") {
@@ -116,20 +143,20 @@ export class ProductService {
     }
 
     if (minPrice || maxPrice) {
-      filter.basePrice = {}
-      if (minPrice) filter.basePrice.$gte = minPrice
-      if (maxPrice) filter.basePrice.$lte = maxPrice
+      filter.basePrice = {};
+      if (minPrice) filter.basePrice.$gte = minPrice;
+      if (maxPrice) filter.basePrice.$lte = maxPrice;
     }
 
     if (search) {
-      filter.$text = { $search: search }
+      filter.$text = { $search: search };
     }
 
     const sortMap: any = {
       newest: { createdAt: -1 },
       price_asc: { basePrice: 1 },
-      price_desc: { basePrice: -1 }
-    }
+      price_desc: { basePrice: -1 },
+    };
 
     const products = await Product.find(filter)
       .sort(sortMap[sort])
@@ -166,7 +193,7 @@ export class ProductService {
         products: formattedResponse,
         total,
         page,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limit),
       },
       statusCode: 200,
     });
@@ -175,16 +202,15 @@ export class ProductService {
   async getProductBySlug(slug: string) {
     const product = await Product.findOne({ slug, isActive: true })
       .populate("category")
-      .populate("uploadedBy", "name email")
+      .populate("uploadedBy", "name email");
 
     if (!product) {
       throw new NotFoundError("Product not found");
     }
 
-    return product
+    return product;
   }
 }
-
 
 const productService = new ProductService();
 export default productService;
