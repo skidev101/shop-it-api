@@ -18,21 +18,25 @@ export interface ProductQuery {
 
 export class ProductService {
   private async generateUniqueSlug(name: string) {
-    let baseSlug = slugify(name, { lower: true, strict: true });
+    const baseSlug = slugify(name, { lower: true, strict: true });
     let slug = baseSlug;
     let counter = 1;
 
+    const existingProduct = await Product.findOne({ slug });
+    if (!existingProduct) return slug;
+
     while (await Product.findOne({ slug })) {
-      slug = `${counter}-${counter++}`;
+      slug = `${baseSlug}-${counter}`;
+      counter++;
     }
 
     return slug;
-  }
+}
 
   async createProduct(data: ProductPayload, userId: string) {
     const user = await User.findOne({ userId });
     if (!user) {
-      throw new NotFoundError("User not found");
+      throw new NotFoundError("User");
     }
 
     if (!user.isVerified) {

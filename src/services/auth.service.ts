@@ -23,7 +23,7 @@ import {
 export class AuthService {
   private generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
-  };
+  }
 
   private generateAccessToken(payload: AccessTokenPayload) {
     return jwt.sign({ ...payload }, env.JWT_ACCESS_SECRET, {
@@ -45,12 +45,11 @@ export class AuthService {
     }
 
     const otp = this.generateOTP();
-    const hashedOtp = await bcrypt.hash(otp, 12);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     await Otp.create({
       email,
-      otp: hashedOtp,
+      otp,
       expiresAt,
       isVerified: false,
       use: "email_verification",
@@ -78,23 +77,23 @@ export class AuthService {
   }
 
   async verifyOtp(email: string, otp: string) {
-    const otpMatch = await Otp.findOne({ email, isVerified: false });
+    const otpRecord = await Otp.findOne({ email, isVerified: false });
 
-    if (!otpMatch) {
+    if (!otpRecord) {
       throw new NotFoundError("OTP");
     }
 
-    if (otpMatch.expiresAt < new Date()) {
+    if (otpRecord.expiresAt < new Date()) {
       throw new UnauthorizedError("Otp has expired");
     }
 
-    const isValid = await bcrypt.compare(otp, otpMatch.otp);
+    const isValid = await bcrypt.compare(otp, otpRecord.otp);
     if (!isValid) {
       throw new UnauthorizedError("Inavalid or expired otp");
     }
 
-    otpMatch.isVerified = true;
-    await otpMatch.save();
+    otpRecord.isVerified = true;
+    await otpRecord.save();
 
     return SuccessRes({ message: "OTP verification successful" });
   }
@@ -114,21 +113,17 @@ export class AuthService {
       throw new ConflictError("Account already exists");
     }
 
-    const passwordHash = await bcrypt.hash(data.password, 12);
-
     const user = await User.create({
       email: data.email,
       firstName: data.firstName,
       lastName: data.lastName,
-      passwordHash,
+      password: data.password,
       role: "customer",
-      isVerified: false,
+      isVerified: true,
       timezone: "Africa/Lagos",
     });
 
     await Otp.deleteOne({ _id: isOtpVerified._id });
-    user.isVerified = true;
-    await user.save();
 
     const newJti = uuidv4();
     const accessPayload = {
@@ -161,17 +156,12 @@ export class AuthService {
   }
 
   async login(data: LoginPayload, metadata: { userAgent: string; ip: string }) {
-    const user = await User.findOne({ email: data.email }).select(
-      "+passwordHash",
-    );
+    const user = await User.findOne({ email: data.email }).select("+password");
     if (!user) {
       throw new NotFoundError("User");
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      data.password,
-      user.passwordHash,
-    );
+    const isPasswordValid = await bcrypt.compare(data.password, user.password);
     if (!isPasswordValid) {
       throw new ValidationError("Invalid credentials");
     }
@@ -192,6 +182,11 @@ export class AuthService {
     const newAccessToken = this.generateAccessToken(accessPayload);
     const newRefreshToken = this.generateRefreshToken(refreshPayload);
     const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 12);
+
+    await RefreshToken.deleteMany({ 
+      userId: user._id, 
+      userAgent: metadata.userAgent 
+    });
 
     await RefreshToken.create({
       userId: user._id,
@@ -329,18 +324,17 @@ export class AuthService {
 
     const otp = this.generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    const hashedOtp = await bcrypt.hash(otp, 12);
 
     await Otp.create({
       email,
-      otp: hashedOtp,
+      otp,
       expiresAt,
       isVerified: false,
       use: "password_reset",
     });
 
     const mailConfig = {
-      from: "stuffworks101@gmail.com",
+      from: "hello@gmail.com",
       to: email,
       subject: "Shop-It - Verify your Email",
       html: `
@@ -363,27 +357,34 @@ export class AuthService {
   }
 
   async verifyPasswordResetOtp(email: string, otp: string) {
-    const otpMatch = await Otp.findOne({
+    const otpRecord = await Otp.findOne({
       email,
       isVerified: false,
       use: "password_reset",
     });
-    if (!otpMatch) {
+    if (!otpRecord) {
       throw new NotFoundError("OTP");
     }
 
-    if (otpMatch.expiresAt < new Date()) {
-      await otpMatch.deleteOne();
+    if (otpRecord.expiresAt < new Date()) {
+      await otpRecord.deleteOne();
       throw new ValidationError("Invalid or expired otp");
     }
 
-    const isOtpValid = await bcrypt.compare(otp, otpMatch.otp);
+    const isOtpValid = await bcrypt.compare(otp, otpRecord.otp);
     if (!isOtpValid) {
       throw new ValidationError("Invalid or expired otp");
     }
 
-    otpMatch.isVerified = true;
-    await otpMatch.save();
+    const updated = await Otp.findOneAndUpdate(
+      { _id: otpRecord._id, isVerified: false },
+      { $set: { isVerified: true } },
+      { new: true },
+    );
+
+    if (!updated) {
+      throw new ValidationError("OTP already verified or processed");
+    }
 
     return SuccessRes({
       message: "Otp verified successfully",
@@ -409,8 +410,7 @@ export class AuthService {
       throw new NotFoundError("User");
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
-    user.passwordHash = hashedPassword;
+    user.password = password;
     await user.save();
 
     await RefreshToken.deleteMany({ _id: user._id });
@@ -464,30 +464,21 @@ export class AuthService {
     newPassword: string,
     currentPassword: string,
   ) {
-    const user = await User.findOne({ _id: userId }).select("+passwordHash");
+    const user = await User.findById(userId);
     if (!user) {
       throw new NotFoundError("User");
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      currentPassword,
-      user.passwordHash,
-    );
-    if (!isPasswordValid) {
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
       throw new ValidationError("Invalid Password");
     }
 
-    const isSamePassword = await bcrypt.compare(newPassword, currentPassword);
-    if (isSamePassword) {
-      throw new ConflictError("Passwords are already same");
-    }
-
-    const newPasswordHash = await bcrypt.hash(newPassword, 12);
-    user.passwordHash = newPasswordHash;
+    user.password = newPassword;
     await user.save();
 
     const mailConfig = {
-      from: "stuffworks101@gmail.com",
+      from: "hello@gmail.com",
       to: user.email,
       subject: "Shop-It - Password changed successfully",
       html: `

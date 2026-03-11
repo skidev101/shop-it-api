@@ -1,10 +1,11 @@
 import { Document, model, Schema, Types } from "mongoose";
+import bcrypt from "bcrypt"
 
 export interface IUser extends Document {
   email: string;
   firstName: string;
   lastName: string;
-  passwordHash: string;
+  password: string;
   role: "customer" | "admin" | "vendor";
   phoneNumber?: string;
   isVerified: boolean;
@@ -19,6 +20,7 @@ export interface IUser extends Document {
   isSuspended: boolean;
   createdAt: Date;
   updatedAt: Date;
+  comparePassword: (password: string ) => Promise<boolean>;
 }
 
 const AddressSchema = new Schema({
@@ -61,7 +63,7 @@ const UserSchema = new Schema<IUser>(
       type: String,
       trim: true,
     },
-    passwordHash: {
+    password: {
       type: String,
       required: true,
       select: false,
@@ -98,21 +100,29 @@ const UserSchema = new Schema<IUser>(
     timestamps: true,
     toJSON: {
       transform: (doc, ret: any) => {
-        delete ret.passwordHash;
+        delete ret.password;
         delete ret.__v;
         return ret;
       },
     },
     toObject: {
       transform: (doc, ret: any) => {
-        delete ret.passwordHash;
+        delete ret.password;
         delete ret.__v;
         return ret;
       },
     },
-  }
+  },
 );
 
-// UserSchema.index({ email: 1 });
+UserSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+
+  this.password = await bcrypt.hash(this.password, 12);
+});
+
+UserSchema.methods.comparePassword = async function(password: string): Promise<Boolean> {
+  return bcrypt.compare(password, this.password)
+}
 
 export const User = model<IUser>("User", UserSchema);

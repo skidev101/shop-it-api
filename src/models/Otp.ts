@@ -1,5 +1,5 @@
 import { Document, Schema, model } from "mongoose";
-
+import bcrypt from "bcrypt";
 
 export interface IOtp extends Document {
   email: string;
@@ -37,5 +37,11 @@ const OtpSchema = new Schema<IOtp>({
   }
 }, { timestamps: true })
 
+
+OtpSchema.index({ email: 1, use: 1 });
+OtpSchema.pre("save", async function() {
+  if (!this.isModified("otp")) return; 
+  this.otp = await bcrypt.hash(this.otp, 12);
+});
 
 export const Otp = model<IOtp>("Otp", OtpSchema)

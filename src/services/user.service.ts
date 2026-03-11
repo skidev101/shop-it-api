@@ -8,7 +8,7 @@ export class UserService {
       userId,
       { $set: data },
       { new: true, runValidators: true },
-    ).select("-passwordHash");
+    ).select("-password");
 
     if (!updatedUser) {
       throw new NotFoundError("User");
