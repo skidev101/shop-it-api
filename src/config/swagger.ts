@@ -5,8 +5,8 @@ import {
 } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
-import { registerSchema, loginSchema } from "../../validators/auth.validator";
-import { createProductSchema } from "../../validators/product.validator";
+import { registerSchema, loginSchema } from "../validators/auth.validator";
+import { createProductSchema } from "../validators/product.validator";
 import { OpenAPIObject } from "@asteasolutions/zod-to-openapi/dist/types";
 
 extendZodWithOpenApi(z);

@@ -181,11 +181,3 @@ export const changePassword = asyncHandler(
     return res.status(200).json(result);
   },
 );
-
-export const updateProfile = asyncHandler(
-  async (req: Request, res: Response) => {
-    const result = await authService.updateProfile();
-
-    return res.status(200).json(result);
-  },
-);

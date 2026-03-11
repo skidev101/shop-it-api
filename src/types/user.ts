@@ -1,7 +1,14 @@
-export interface User {
-  id: string;
-  username: string;
+export interface UpdateProfilePayload {
   email: string;
-  password: string;
-  refreshTokens: string[]
+  firstname?: string;
+  lastname?: string;
+  phoneNumber?: string;
+  timezone: string;
+  addresses?: {
+    street: string;
+    city: string;
+    country: string;
+    zipCode: string;
+    isDefault: boolean;
+  }[];
 }

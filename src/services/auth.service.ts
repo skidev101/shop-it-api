@@ -21,7 +21,7 @@ import {
 } from "../types/auth";
 
 export class AuthService {
-  private generateOTP = (): string => {
+  private generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
@@ -501,10 +501,6 @@ export class AuthService {
     logger.info("Password CHANGED successfully");
 
     return SuccessRes({ message: "Password changed successfully" });
-  }
-
-  async updateProfile() {
-    return;
   }
 }
 

@@ -4,6 +4,7 @@ import { ApiError, NotFoundError } from '../utils/api-errors';
 // import { MongoError } from 'mongodb';
 import mongoose from 'mongoose';
 import { logger } from '../lib/logger';
+import z from 'zod';
 
 interface ErrorResponse {
   status: 'error';
@@ -22,6 +23,16 @@ export const errorHandler = (
 ): void => {
   let error = err;
 
+  // Zod validation errors
+  if (err instanceof z.ZodError) {
+    const details = err.issues.map((issue) => ({
+      field: issue.path.join("."),
+      message: issue.message
+    }))
+    error = new ApiError(400, "validation failed", true, "VALIDATION_ERROR");
+    (error as any).details = details
+  }
+
   // Handle Mongoose validation errors
   if (err instanceof mongoose.Error.ValidationError) {
     const details = Object.values(err.errors).map((e) => ({
@@ -39,10 +50,10 @@ export const errorHandler = (
 
   // Handle MongoDB duplicate key errors
   if ((err as any).code === 11000) {
-    const field = Object.keys((err as any).keyPattern)[0];
+    const field = Object.keys((err as any).keyValue || {})[0] || "Field";
     error = new ApiError(
       409,
-      `${field} already exists`,
+      `${field.charAt(0).toUpperCase() + field.slice(1)} already exists`,
       true,
       'DUPLICATE_KEY'
     );
