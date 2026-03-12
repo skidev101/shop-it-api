@@ -6,6 +6,7 @@ import { SuccessRes } from "../utils/responses";
 import slugify from "slugify";
 import { logger } from "../lib/logger";
 import { CloudinaryUtil } from "../utils/cloudinary";
+import { nanoid } from "nanoid";
 
 export interface ProductQuery {
   page?: number;
@@ -20,17 +21,7 @@ export interface ProductQuery {
 
 export class ProductService {
   private async generateUniqueSlug(name: string) {
-    const baseSlug = slugify(name, { lower: true, strict: true });
-    let slug = baseSlug;
-    let counter = 1;
-
-    const existingProduct = await Product.findOne({ slug });
-    if (!existingProduct) return slug;
-
-    while (await Product.findOne({ slug })) {
-      slug = `${baseSlug}-${counter}`;
-      counter++;
-    }
+    const slug = `${slugify(name, { lower: true, strict: true })}-${nanoid(6)}`;
 
     return slug;
   }
@@ -93,29 +84,41 @@ export class ProductService {
     }
   }
 
-
   async deleteProduct(productId: string, userId: string) {
-    const product = await Product.findOne({
-      _id: productId,
-      uploadedBy: userId,
-    });
+    try {
+      const product = await Product.findOne({
+        _id: productId,
+        uploadedBy: userId,
+      });
 
-    if (!product) {
-      throw new NotFoundError("Product not found or unauthorized");
+      if (!product) {
+        throw new NotFoundError("Product not found or unauthorized");
+      }
+
+      const publicIds = [
+        ...product.images.map((img) => img.public_id),
+        ...(product.variants ?? []).flatMap((v) =>
+          v.images.map((img) => img.public_id),
+        ),
+      ];
+
+      await Product.updateOne(
+        { _id: productId },
+        { deletedAt: new Date(), isActive: false },
+      );
+
+      if (publicIds.length > 0) {
+        await ImageCleanupQueue.add({ publicIds, productId });
+      }
+
+      return SuccessRes({
+        message: "Product deleted",
+        statusCode: 200,
+      });
+    } catch (error) {
+      logger.error("Error deleting product:", error);
+      throw error;
     }
-
-    const publicIds = product.images.map((img: any) => img.public_id);
-
-    await Product.findByIdAndDelete(productId);
-
-    if (publicIds.length > 0) {
-      await CloudinaryUtil.deleteMultipleFiles(publicIds);
-    }
-
-    return SuccessRes({
-      message: "Product deleted",
-      statusCode: 200,
-    });
   }
 
   async getProducts(query: ProductQuery) {
@@ -129,9 +132,11 @@ export class ProductService {
       isFeatured,
       sort = "newest",
     } = query;
+    const safeLimit = Math.min(limit, 50); // Cap limit to 50
 
     const filter: any = {
       isActive: true,
+      deletedAt: null,
     };
 
     if (category) {
@@ -160,8 +165,8 @@ export class ProductService {
 
     const products = await Product.find(filter)
       .sort(sortMap[sort])
-      .skip((page - 1) * limit)
-      .limit(limit);
+      .skip((page - 1) * safeLimit)
+      .limit(safeLimit);
 
     const total = await Product.countDocuments(filter);
 
