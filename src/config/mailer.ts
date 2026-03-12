@@ -6,7 +6,7 @@ import {
 const mailer = nodemailer.createTransport({
   host: env.SMTP_HOST,
   port: parseInt(env.EMAIL_PORT as string),
-  secure: true, // true for 465, false for other ports
+  secure: false, // true for 465, false for other ports
   auth: {
     user: env.EMAIL_USER,
     pass: env.EMAIL_PASSWORD,

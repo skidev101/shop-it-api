@@ -167,7 +167,7 @@ export const resetPassword = asyncHandler(
 
 export const changePassword = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const userId = req.user?.userId;
+    const userId = req.body.userId;   // just for testing, get from req.user through auth middleware
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }

@@ -20,7 +20,7 @@ export interface IUser extends Document {
   isSuspended: boolean;
   createdAt: Date;
   updatedAt: Date;
-  comparePassword: (password: string ) => Promise<boolean>;
+  comparePassword: (password: string) => Promise<boolean>;
 }
 
 const AddressSchema = new Schema({
@@ -121,7 +121,7 @@ UserSchema.pre("save", async function () {
   this.password = await bcrypt.hash(this.password, 12);
 });
 
-UserSchema.methods.comparePassword = async function(password: string): Promise<Boolean> {
+UserSchema.methods.comparePassword = async function(password: string): Promise<boolean> {
   return bcrypt.compare(password, this.password)
 }
 

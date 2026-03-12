@@ -1,6 +1,5 @@
 import { Router, Request, Response } from "express";
 import authRoutes from "./auth"
-import swaggerUi from "swagger-ui-express";
 const router: Router = Router()
 
 

@@ -55,6 +55,8 @@ export class AuthService {
       use: "email_verification",
     });
 
+    console.log("Generated OTP:", otp); // Log the OTP for debugging purposes
+
     const mailConfig = {
       from: env.EMAIL_USER,
       to: email,
@@ -77,19 +79,24 @@ export class AuthService {
   }
 
   async verifyOtp(email: string, otp: string) {
-    const otpRecord = await Otp.findOne({ email, isVerified: false });
+    const otpRecord = await Otp.findOne({
+      email,
+      isVerified: false,
+      use: "email_verification",
+    });
 
     if (!otpRecord) {
       throw new NotFoundError("OTP");
     }
 
     if (otpRecord.expiresAt < new Date()) {
+      await otpRecord.deleteOne();
       throw new UnauthorizedError("Otp has expired");
     }
 
     const isValid = await bcrypt.compare(otp, otpRecord.otp);
     if (!isValid) {
-      throw new UnauthorizedError("Inavalid or expired otp");
+      throw new UnauthorizedError("Invalid or expired otp");
     }
 
     otpRecord.isVerified = true;
@@ -106,6 +113,14 @@ export class AuthService {
     });
     if (!isOtpVerified) {
       throw new UnauthorizedError("Email not verified");
+    }
+
+    // Check OTP hasn't expired
+    if (isOtpVerified.expiresAt < new Date()) {
+      await isOtpVerified.deleteOne();
+      throw new UnauthorizedError(
+        "Verification expired. Please verify email again",
+      );
     }
 
     const userExists = await User.findOne({ email: data.email });
@@ -140,6 +155,7 @@ export class AuthService {
 
     await RefreshToken.create({
       userId: user._id,
+      jti: newJti,
       tokenHash: newRefreshTokenHash,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
@@ -183,9 +199,9 @@ export class AuthService {
     const newRefreshToken = this.generateRefreshToken(refreshPayload);
     const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 12);
 
-    await RefreshToken.deleteMany({ 
-      userId: user._id, 
-      userAgent: metadata.userAgent 
+    await RefreshToken.deleteMany({
+      userId: user._id,
+      userAgent: metadata.userAgent,
     });
 
     await RefreshToken.create({
@@ -324,6 +340,8 @@ export class AuthService {
 
     const otp = this.generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    console.log("generated otp:", otp);
 
     await Otp.create({
       email,
@@ -464,7 +482,7 @@ export class AuthService {
     newPassword: string,
     currentPassword: string,
   ) {
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).select("+password");
     if (!user) {
       throw new NotFoundError("User");
     }

@@ -1,14 +1,15 @@
 // src/middleware/errorHandler.ts
-import { Request, Response, NextFunction } from 'express';
-import { ApiError, NotFoundError } from '../utils/api-errors';
+import { Request, Response, NextFunction } from "express";
+import { ApiError, NotFoundError } from "../utils/api-errors";
 // import { MongoError } from 'mongodb';
-import mongoose from 'mongoose';
-import { logger } from '../lib/logger';
-import z from 'zod';
+import mongoose from "mongoose";
+import { logger } from "../lib/logger";
+import z from "zod";
 import multer from "multer";
+import { env } from "../config/env";
 
 interface ErrorResponse {
-  status: 'error';
+  status: "error";
   statusCode: number;
   message: string;
   code?: string | undefined;
@@ -20,25 +21,27 @@ export const errorHandler = (
   err: Error,
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   let error = err;
+
+  console.error("error caught:", err);
 
   // Zod validation errors
   if (err instanceof z.ZodError) {
     const details = err.issues.map((issue) => ({
       field: issue.path.join("."),
-      message: issue.message
-    }))
+      message: issue.message,
+    }));
     error = new ApiError(400, "validation failed", true, "VALIDATION_ERROR");
-    (error as any).details = details
+    (error as any).details = details;
   }
 
   if (err instanceof multer.MulterError) {
     const details = {
       field: err.field,
       message: err.message,
-    }
+    };
     error = new ApiError(400, err.message, true, "FILE_UPLOAD_ERROR");
     (error as any).details = details;
   }
@@ -49,13 +52,18 @@ export const errorHandler = (
       field: e.path,
       message: e.message,
     }));
-    error = new ApiError(400, 'Validation failed', true, 'VALIDATION_ERROR');
+    error = new ApiError(400, "Validation failed", true, "VALIDATION_ERROR");
     (error as any).details = details;
   }
 
   // Handle Mongoose cast errors (invalid ObjectId)
   if (err instanceof mongoose.Error.CastError) {
-    error = new ApiError(400, `Invalid ${err.path}: ${err.value}`, true, 'INVALID_ID');
+    error = new ApiError(
+      400,
+      `Invalid ${err.path}: ${err.value}`,
+      true,
+      "INVALID_ID",
+    );
   }
 
   // Handle MongoDB duplicate key errors
@@ -65,30 +73,52 @@ export const errorHandler = (
       409,
       `${field.charAt(0).toUpperCase() + field.slice(1)} already exists`,
       true,
-      'DUPLICATE_KEY'
+      "DUPLICATE_KEY",
     );
   }
 
   // Handle JWT errors
-  if (err.name === 'JsonWebTokenError') {
-    error = new ApiError(401, 'Invalid token', true, 'INVALID_TOKEN');
+  if (err.name === "JsonWebTokenError") {
+    error = new ApiError(401, "Invalid token", true, "INVALID_TOKEN");
   }
 
-  if (err.name === 'TokenExpiredError') {
-    error = new ApiError(401, 'Token expired', true, 'TOKEN_EXPIRED');
+  if (err.name === "TokenExpiredError") {
+    error = new ApiError(401, "Token expired", true, "TOKEN_EXPIRED");
   }
 
   // Default to AppError or create one
-  const appError = error instanceof ApiError 
-    ? error 
-    : new ApiError(500, 'Internal server error', false);
+  let appError: ApiError;
+
+  if (error instanceof ApiError) {
+    appError = error;
+  } else {
+    // Determine status code (standard Errors don't have one, so default to 500)
+    const statusCode = (error as any).statusCode || 500;
+
+    // In development, show the REAL error message (e.g., "Connection refused")
+    // In production, keep it generic for security
+    const message =
+      env.NODE_ENV === "development" ? error.message : "Internal server error";
+
+    appError = new ApiError(statusCode, message, false);
+
+    // CRITICAL: Preserve the original stack trace!
+    // Without this, the stack trace will only point to this middleware.
+    if (error.stack) {
+      appError.stack = error.stack;
+    }
+  }
 
   const errorResponse: ErrorResponse = {
-    status: 'error',
+    status: "error",
     statusCode: appError.statusCode,
     message: appError.message,
     code: appError.code,
   };
+
+  if (env.NODE_ENV === "development" && appError.stack) {
+    errorResponse.stack = appError.stack;
+  }
 
   // Add details if they exist
   if ((appError as any).details) {
@@ -97,7 +127,7 @@ export const errorHandler = (
 
   // Log error
   if (appError.statusCode >= 500) {
-    logger.error('Server Error:', {
+    logger.error("Server Error:", {
       message: appError.message,
       statusCode: appError.statusCode,
       stack: appError.stack,
@@ -107,7 +137,7 @@ export const errorHandler = (
       userId: (req as any).user?.userId,
     });
   } else {
-    logger.warn('Client Error:', {
+    logger.warn("Client Error:", {
       message: appError.message,
       statusCode: appError.statusCode,
       url: req.url,
@@ -116,7 +146,7 @@ export const errorHandler = (
   }
 
   // Include stack trace in development
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === "development") {
     errorResponse.stack = appError.stack;
   }
 
@@ -124,7 +154,11 @@ export const errorHandler = (
 };
 
 // Handle 404 routes
-export const notFoundHandler = (req: Request, res: Response, next: NextFunction) => {
+export const notFoundHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   next(new NotFoundError(`Route ${req.originalUrl}`));
 };
 
