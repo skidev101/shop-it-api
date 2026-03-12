@@ -2,10 +2,10 @@ import { Document, Schema, Types, model } from "mongoose";
 
 export interface IProductVariant {
   sku: string;
-  attributes: Record<string, string>;
+  attributes: Array<{ name: string; value: string }>;
   price?: number;
   stock: number;
-  image: string;
+  images: Array<{ url: string; public_id: string }>;
   isActive?: boolean;
 }
 
@@ -27,19 +27,20 @@ export interface IProduct extends Document {
   ratingCount: number;
   createdAt: Date;
   updatedAt: Date;
+  deletedAt: Date | null;
 }
 
 const variantSchema = new Schema<IProductVariant>({
   sku: {
     type: String,
     required: true,
-    unique: true,
   },
-  attributes: {
-    type: Map,
-    of: String,
-    required: true,
-  },
+  attributes: [
+    {
+      name: { type: String, required: true },
+      value: { type: String, required: true },
+    },
+  ],
   price: {
     type: Number,
     min: 0,
@@ -49,7 +50,7 @@ const variantSchema = new Schema<IProductVariant>({
     required: true,
     min: 0,
   },
-  image: [
+  images: [
     {
       url: { type: String, required: true },
       public_id: { type: String, required: true },
@@ -139,6 +140,10 @@ const ProductSchema = new Schema<IProduct>(
       type: Number,
       default: 0,
     },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true },
 );
@@ -147,5 +152,8 @@ ProductSchema.index(
   { name: "text", description: "text", tags: "text" },
   { weights: { name: 10, description: 2 } },
 );
+ProductSchema.index({ slug: 1 });
+ProductSchema.index({ category: 1 });
+ProductSchema.index({ deletedAt: 1 });
 
 export const Product = model<IProduct>("Product", ProductSchema);
