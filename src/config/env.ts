@@ -20,4 +20,6 @@ export const env = {
   CLOUDINARY_NAME: process.env.CLOUDINARY_NAME!,
   CLOUDINARY_KEY: process.env.CLOUDINARY_KEY!,
   CLOUDINARY_SECRET: process.env.CLOUDINARY_SECRET!,
+  REDIS_HOST: process.env.REDIS_HOST!,
+  REDIS_PORT: process.env.REDIS_PORT!,
 }

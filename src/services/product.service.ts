@@ -7,6 +7,7 @@ import slugify from "slugify";
 import { logger } from "../lib/logger";
 import { CloudinaryUtil } from "../utils/cloudinary";
 import { nanoid } from "nanoid";
+import { imageCleanupQueue } from "../queues/imageCleanup.queue";
 
 export interface ProductQuery {
   page?: number;
@@ -108,7 +109,20 @@ export class ProductService {
       );
 
       if (publicIds.length > 0) {
-        await ImageCleanupQueue.add({ publicIds, productId });
+        await imageCleanupQueue.add(
+          "delete-product-images",
+          { publicIds, productId },
+          {
+            jobId: `product-delete-${productId}-${Date.now()}`,
+            attempts: 5,
+            backoff: {
+              type: "exponential",
+              delay: 5000,
+            },
+            removeOnComplete: true,
+            removeOnFail: 1000,
+          },
+        );
       }
 
       return SuccessRes({
