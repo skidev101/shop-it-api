@@ -13,6 +13,7 @@ const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req: any, file: any) => {
     const folderName = req.body.uploadType || "general";
+    console.log("Uploading to Cloudinary folder:", folderName);
 
     return {
       folder: folderName,

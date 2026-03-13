@@ -7,6 +7,7 @@ export interface AuthRequest extends Request {
   user?: {
     userId: string;
     email: string;
+    role: string;
   };
 }
 
@@ -25,12 +26,14 @@ export const authenticate = async (
     const payload = jwt.verify(token, env.JWT_ACCESS_SECRET || "") as {
       userId: string;
       email: string;
+      role: string;
       jti: string;
     };
 
     req.user = {
       userId: payload.userId,
       email: payload.email,
+      role: payload.role
     };
     next();
   } catch (error) {

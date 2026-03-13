@@ -16,6 +16,8 @@ export interface IProduct extends Document {
   description: string;
   basePrice: number;
   comparePrice?: number;
+  sku: string;
+  stock: number;
   category: Types.ObjectId;
   images: Array<{ url: string; public_id: string }>;
   variants?: IProductVariant[];
@@ -95,6 +97,15 @@ const ProductSchema = new Schema<IProduct>(
       type: Number,
       min: 0,
     },
+    sku: {
+      type: String,
+      required: true,
+    },
+    stock: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
     category: {
       type: Schema.Types.ObjectId,
       ref: "Category",
@@ -112,7 +123,11 @@ const ProductSchema = new Schema<IProduct>(
     },
     variants: {
       type: [variantSchema],
-      default: [],
+      required: true,
+      validate: [
+        (v: any) => v.length > 0,
+        "A product must have at least one variant",
+      ],
     },
     specifications: {
       type: Map,
@@ -152,8 +167,8 @@ ProductSchema.index(
   { name: "text", description: "text", tags: "text" },
   { weights: { name: 10, description: 2 } },
 );
-ProductSchema.index({ slug: 1 });
-ProductSchema.index({ category: 1 });
-ProductSchema.index({ deletedAt: 1 });
+// ProductSchema.index({ slug: 1 });
+// ProductSchema.index({ category: 1 });
+// ProductSchema.index({ deletedAt: 1 });
 
 export const Product = model<IProduct>("Product", ProductSchema);

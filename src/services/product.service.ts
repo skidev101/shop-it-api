@@ -32,16 +32,25 @@ export class ProductService {
     userId: string,
     files: Express.Multer.File[],
   ) {
-    const user = await User.findOne({ userId });
+    const user = await User.findOne({ _id: userId });
+    console.log("user from DB in createProduct:", user);
     if (!user) throw new NotFoundError("User");
-    if (!user.isVerified)
+    if (!user.isVerified) {
+      console.log("User account not verified. Cannot create product.");
       throw new UnauthorizedError("User account not verified");
-    if (user.isSuspended) throw new UnauthorizedError("User account suspended");
+    }
+    if (user.isSuspended) {
+      console.log("User account suspended. Cannot create product.");
+      throw new UnauthorizedError("User account suspended");
+    }
 
-    const imageObjects = files.map((file) => ({
-      url: file.path,
-      public_id: file.filename,
-    }));
+    let imageObjects: Array<{ url: string; public_id: string }> = [];
+    if (files && files.length > 0) {
+      imageObjects = files.map((file) => ({
+        url: file.path,
+        public_id: file.filename,
+      }));
+    }
 
     try {
       const slug = await this.generateUniqueSlug(data.name);
