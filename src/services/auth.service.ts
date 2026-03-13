@@ -144,10 +144,12 @@ export class AuthService {
     const accessPayload = {
       userId: user._id.toString(),
       email: user.email,
+      role: user.role,
     };
     const refreshPayload = {
       userId: user._id.toString(),
       jti: newJti,
+      role: user.role
     };
     const newAccessToken = this.generateAccessToken(accessPayload);
     const newRefreshToken = this.generateRefreshToken(refreshPayload);
@@ -190,10 +192,12 @@ export class AuthService {
     const accessPayload = {
       userId: user._id.toString(),
       email: user.email,
+      role: user.role
     };
     const refreshPayload = {
       userId: user._id.toString(),
       jti: newJti,
+      role: user.role
     };
     const newAccessToken = this.generateAccessToken(accessPayload);
     const newRefreshToken = this.generateRefreshToken(refreshPayload);
@@ -231,6 +235,7 @@ export class AuthService {
       payload = jwt.verify(token, env.JWT_REFRESH_SECRET) as {
         userId: string;
         jti: string;
+        role: string;
       };
     } catch (error) {
       console.error("Error refreshing token", error);
@@ -272,10 +277,12 @@ export class AuthService {
     const accessPayload = {
       userId: user._id.toString(),
       email: user.email,
+      role: user.role
     };
     const refreshPayload = {
       userId: user._id.toString(),
       jti: newJti,
+      role: user.role
     };
     const newAccessToken = this.generateAccessToken(accessPayload);
     const newRefreshToken = this.generateRefreshToken(refreshPayload);
@@ -439,10 +446,12 @@ export class AuthService {
     const accessToken = this.generateAccessToken({
       userId: user._id.toString(),
       email: user.email,
+      role: user.role
     });
     const refreshToken = this.generateRefreshToken({
       userId: user._id.toString(),
       jti: newJti,
+      role: user.role
     });
 
     const newRefreshTokenHash = await bcrypt.hash(refreshToken, 12);

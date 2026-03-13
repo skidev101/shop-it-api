@@ -27,6 +27,15 @@ export class ProductService {
     return slug;
   }
 
+  private generateSku(name: string, category: string): string {
+  const catPart = category.substring(0, 3).toUpperCase();
+  const namePart = name.substring(0, 3).toUpperCase();
+  
+  const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+
+  return `${catPart}-${namePart}-${randomPart}`;
+}
+
   async createProduct(
     data: ProductPayload,
     userId: string,
@@ -44,21 +53,20 @@ export class ProductService {
       throw new UnauthorizedError("User account suspended");
     }
 
-    let imageObjects: Array<{ url: string; public_id: string }> = [];
-    if (files && files.length > 0) {
-      imageObjects = files.map((file) => ({
+      let imageObjects = files?.map((file) => ({
         url: file.path,
         public_id: file.filename,
-      }));
-    }
+      })) || [];
 
     try {
       const slug = await this.generateUniqueSlug(data.name);
+      const sku = this.generateSku(data.name, data.category);
 
       const productData: any = {
         uploadedBy: user._id,
         name: data.name,
         slug,
+        sku,
         description: data.description,
         basePrice: data.price,
         category: data.category,

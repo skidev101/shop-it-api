@@ -27,7 +27,6 @@ export const authenticate = async (
       userId: string;
       email: string;
       role: string;
-      jti: string;
     };
 
     req.user = {

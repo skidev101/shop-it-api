@@ -5,8 +5,7 @@ import productService from "../services/product.service";
 
 export const createProduct = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    // const userId = req.user?.userId;
-    const {userId} = req.body; // Temporary workaround to get userId from request body for testing
+    const userId = req.user!.userId;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -20,7 +19,7 @@ export const createProduct = asyncHandler(
 
 export const deleteProduct = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const userId = req.user?.userId;
+    const userId = req.user!.userId;
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
