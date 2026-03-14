@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createProduct, getProducts } from "../controllers/product.controller";
+import { createProduct, getProducts, getProductBySlug } from "../controllers/product.controller";
 import { upload } from "../config/cloudinary";
 import { authenticate } from "../middlewares/auth.middleware";
 import { createProductSchema } from "../validators/product.validator";
@@ -8,7 +8,9 @@ import { authorize } from "../middlewares/authorize.middleware";
 
 const router: Router = Router();
 
-router.get("/", getProducts)
+router.get("/", getProducts);
+
+router.get("/:slug", getProductBySlug);
 
 router.post(
   "/new",

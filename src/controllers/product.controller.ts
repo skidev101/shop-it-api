@@ -9,7 +9,7 @@ export const createProduct = asyncHandler(
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    
+
     const files = req.files as Express.Multer.File[];
 
     const result = await productService.createProduct(req.body, userId, files);
@@ -26,6 +26,20 @@ export const getProducts = asyncHandler(
     return res.status(201).json(result);
   },
 );
+
+export const getProductBySlug = asyncHandler(
+  async (req: Request, res: Response) => {
+    const slug = req.params.slug;
+    if (!slug || typeof slug !== "string") {
+      return res.status(400).json({ message: "Product slug is required"})
+    }
+    const result = await productService.getProductBySlug(slug);
+
+    return res.status(201).json(result);
+  },
+);
+
+
 
 export const softDeleteProduct = asyncHandler(
   async (req: AuthRequest, res: Response) => {
