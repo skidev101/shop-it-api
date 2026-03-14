@@ -12,7 +12,7 @@ import { imageCleanupQueue } from "../queues/imageCleanup.queue";
 export interface ProductQuery {
   page?: number;
   limit?: number;
-  isFeatured?: boolean;
+  isFeatured?: boolean | string | undefined;
   category?: string;
   minPrice?: number;
   maxPrice?: number;
@@ -28,13 +28,13 @@ export class ProductService {
   }
 
   private generateSku(name: string, category: string): string {
-  const catPart = category.substring(0, 3).toUpperCase();
-  const namePart = name.substring(0, 3).toUpperCase();
-  
-  const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const catPart = category.substring(0, 3).toUpperCase();
+    const namePart = name.substring(0, 3).toUpperCase();
 
-  return `${catPart}-${namePart}-${randomPart}`;
-}
+    const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+
+    return `${catPart}-${namePart}-${randomPart}`;
+  }
 
   async createProduct(
     data: ProductPayload,
@@ -53,7 +53,8 @@ export class ProductService {
       throw new UnauthorizedError("User account suspended");
     }
 
-      let imageObjects = files?.map((file) => ({
+    let imageObjects =
+      files?.map((file) => ({
         url: file.path,
         public_id: file.filename,
       })) || [];
@@ -68,19 +69,34 @@ export class ProductService {
         slug,
         sku,
         description: data.description,
-        basePrice: data.price,
+        basePrice: data.basePrice,
         category: data.category,
         images: imageObjects,
         variants: data.variants,
         specifications: data.specifications,
+        tags: data.tags,
+        stock: data.stock,
         isActive: true,
         isFeatured: false,
-        tags: data.tags,
       };
+
+      if (!productData.variants || productData.variants.length === 0) {
+        productData.variants = [
+          {
+            sku: productData.sku,
+            price: productData.basePrice,
+            stock: productData.stock,
+            attributes: [],
+            images: [],
+          },
+        ];
+      }
 
       if (data.comparePrice !== undefined) {
         productData.comparePrice = data.comparePrice;
       }
+
+      console.log("product create payload:", productData);
 
       const product = await Product.create(productData);
 
@@ -102,56 +118,6 @@ export class ProductService {
     }
   }
 
-  async deleteProduct(productId: string, userId: string) {
-    try {
-      const product = await Product.findOne({
-        _id: productId,
-        uploadedBy: userId,
-      });
-
-      if (!product) {
-        throw new NotFoundError("Product not found or unauthorized");
-      }
-
-      const publicIds = [
-        ...product.images.map((img) => img.public_id),
-        ...(product.variants ?? []).flatMap((v) =>
-          v.images.map((img) => img.public_id),
-        ),
-      ];
-
-      await Product.updateOne(
-        { _id: productId },
-        { deletedAt: new Date(), isActive: false },
-      );
-
-      if (publicIds.length > 0) {
-        await imageCleanupQueue.add(
-          "delete-product-images",
-          { publicIds, productId },
-          {
-            jobId: `product-delete-${productId}-${Date.now()}`,
-            attempts: 5,
-            backoff: {
-              type: "exponential",
-              delay: 5000,
-            },
-            removeOnComplete: true,
-            removeOnFail: 1000,
-          },
-        );
-      }
-
-      return SuccessRes({
-        message: "Product deleted",
-        statusCode: 200,
-      });
-    } catch (error) {
-      logger.error("Error deleting product:", error);
-      throw error;
-    }
-  }
-
   async getProducts(query: ProductQuery) {
     const {
       page = 1,
@@ -163,7 +129,7 @@ export class ProductService {
       isFeatured,
       sort = "newest",
     } = query;
-    const safeLimit = Math.min(limit, 50); // Cap limit to 50
+    const safeLimit = Math.min(Number(limit), 50); // Cap limit to 50
 
     const filter: any = {
       isActive: true,
@@ -174,14 +140,15 @@ export class ProductService {
       filter.category = new mongoose.Types.ObjectId(category);
     }
 
-    if (typeof isFeatured === "boolean") {
+    const featureValue = isFeatured === 'true' ? true : isFeatured === 'false' ? false : undefined;
+    if (typeof featureValue === "boolean") {
       filter.isFeatured = isFeatured;
     }
 
     if (minPrice || maxPrice) {
       filter.basePrice = {};
-      if (minPrice) filter.basePrice.$gte = minPrice;
-      if (maxPrice) filter.basePrice.$lte = maxPrice;
+      if (minPrice) filter.basePrice.$gte = Number(minPrice);
+      if (maxPrice) filter.basePrice.$lte = Number(maxPrice);
     }
 
     if (search) {
@@ -200,6 +167,8 @@ export class ProductService {
       .limit(safeLimit);
 
     const total = await Product.countDocuments(filter);
+
+    console.log("products fetched:", products)
 
     const formattedResponse = products.map((product: IProduct) => {
       const productData = product.toObject();
@@ -245,6 +214,83 @@ export class ProductService {
     }
 
     return product;
+  }
+
+  
+
+  async softDeleteProduct(productId: string, userId: string) {
+    const product = await Product.findOneAndUpdate(
+      { _id: productId, uploadedBy: userId },
+      {
+        $set: {
+          isActive: false,
+          isDeleted: true,
+          deletedAt: new Date(),
+        },
+      },
+      { new: true },
+    );
+
+    if (!product) {
+      throw new NotFoundError("Product not found or unauthorized");
+    }
+
+    logger.info(`Product ${productId} moved to trash by ${userId}`);
+
+    return SuccessRes({
+      message: "Product soft-deleted",
+      statusCode: 200,
+    });
+  }
+
+  async hardDeleteProduct(productId: string, userId: string) {
+    try {
+      const product = await Product.findOne({
+        _id: productId,
+        uploadedBy: userId,
+      });
+
+      if (!product) {
+        throw new NotFoundError("Product not found or unauthorized");
+      }
+
+      const publicIds = [
+        ...product.images?.map((img) => img.public_id),
+        ...(product.variants ?? []).flatMap((v) =>
+          v.images?.map((img) => img.public_id),
+        ),
+      ];
+
+      await Product.updateOne(
+        { _id: productId },
+        { deletedAt: new Date(), isActive: false },
+      );
+
+      if (publicIds.length > 0) {
+        await imageCleanupQueue.add(
+          "delete-product-images",
+          { publicIds, productId },
+          {
+            jobId: `product-delete-${productId}-${Date.now()}`,
+            attempts: 5,
+            backoff: {
+              type: "exponential",
+              delay: 5000,
+            },
+            removeOnComplete: true,
+            removeOnFail: 1000,
+          },
+        );
+      }
+
+      return SuccessRes({
+        message: "Product deleted",
+        statusCode: 200,
+      });
+    } catch (error) {
+      logger.error("Error deleting product:", error);
+      throw error;
+    }
   }
 }
 

@@ -29,6 +29,7 @@ export interface IProduct extends Document {
   ratingCount: number;
   createdAt: Date;
   updatedAt: Date;
+  isDeleted: boolean;
   deletedAt: Date | null;
 }
 
@@ -39,8 +40,8 @@ const variantSchema = new Schema<IProductVariant>({
   },
   attributes: [
     {
-      name: { type: String, required: true },
-      value: { type: String, required: true },
+      name: { type: String },
+      value: { type: String },
     },
   ],
   price: {
@@ -154,6 +155,10 @@ const ProductSchema = new Schema<IProduct>(
     ratingCount: {
       type: Number,
       default: 0,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false
     },
     deletedAt: {
       type: Date,

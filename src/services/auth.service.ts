@@ -27,7 +27,7 @@ export class AuthService {
 
   private generateAccessToken(payload: AccessTokenPayload) {
     return jwt.sign({ ...payload }, env.JWT_ACCESS_SECRET, {
-      expiresIn: "15m",
+      expiresIn: "1d",
     });
   }
 

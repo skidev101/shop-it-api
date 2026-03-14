@@ -19,3 +19,7 @@ mongoose.connection.on("error", (err) => {
 mongoose.connection.on("disconnected", () => {
   console.warn("Database disconnected");
 });
+
+mongoose.connection.on("reconnected", () => {
+  console.info("Database reconnected");
+});

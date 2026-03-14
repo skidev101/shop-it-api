@@ -2,7 +2,7 @@ export interface ProductPayload {
   name: string;
   description: string;
   stock: number;
-  price: number;
+  basePrice: number;
   comparePrice?: number;
   category: string;
   images: string[];
