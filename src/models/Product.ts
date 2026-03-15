@@ -1,69 +1,28 @@
 import { Document, Schema, Types, model } from "mongoose";
 
-export interface IProductVariant {
-  sku: string;
-  attributes: Array<{ name: string; value: string }>;
-  price?: number;
-  stock: number;
-  images: Array<{ url: string; public_id: string }>;
-  isActive?: boolean;
-}
-
 export interface IProduct extends Document {
   uploadedBy: Types.ObjectId;
   name: string;
   slug: string;
   description: string;
   basePrice: number;
-  comparePrice?: number | undefined;
-  sku: string;
-  stock: number;
+  comparePrice?: number;
+  sku: string;        // base/default SKU — variants carry their own
+  stock: number;      // denormalized total; sum of all variant stocks
   category: Types.ObjectId;
   images: Array<{ url: string; public_id: string }>;
-  variants?: IProductVariant[];
+  variants: Types.ObjectId[];  // refs to Variant documents
   specifications: Record<string, string>;
   tags: string[];
   isActive: boolean;
   isFeatured: boolean;
   ratingAverage: number;
   ratingCount: number;
-  createdAt: Date;
-  updatedAt: Date;
   isDeleted: boolean;
   deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
-
-const variantSchema = new Schema<IProductVariant>({
-  sku: {
-    type: String,
-    required: true,
-  },
-  attributes: [
-    {
-      name: { type: String },
-      value: { type: String },
-    },
-  ],
-  price: {
-    type: Number,
-    min: 0,
-  },
-  stock: {
-    type: Number,
-    required: true,
-    min: 0,
-  },
-  images: [
-    {
-      url: { type: String, required: true },
-      public_id: { type: String, required: true },
-    },
-  ],
-  isActive: {
-    type: Boolean,
-    default: true,
-  },
-});
 
 const ProductSchema = new Schema<IProduct>(
   {
@@ -101,11 +60,15 @@ const ProductSchema = new Schema<IProduct>(
     sku: {
       type: String,
       required: true,
+      trim: true,
     },
     stock: {
       type: Number,
       required: true,
       min: 0,
+      default: 0,
+      // This is a denormalized field. It is NOT set by the client.
+      // It is recalculated by the service whenever a variant's stock changes.
     },
     category: {
       type: Schema.Types.ObjectId,
@@ -122,14 +85,12 @@ const ProductSchema = new Schema<IProduct>(
       ],
       required: true,
     },
-    variants: {
-      type: [variantSchema],
-      required: true,
-      validate: [
-        (v: any) => v.length > 0,
-        "A product must have at least one variant",
-      ],
-    },
+    variants: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Variant",
+      },
+    ],
     specifications: {
       type: Map,
       of: String,
@@ -146,7 +107,7 @@ const ProductSchema = new Schema<IProduct>(
     },
     tags: {
       type: [String],
-      required: true,
+      default: [],
     },
     ratingAverage: {
       type: Number,
@@ -172,29 +133,5 @@ ProductSchema.index(
   { name: "text", description: "text", tags: "text" },
   { weights: { name: 10, description: 2 } },
 );
-// ProductSchema.index({ slug: 1 });
-// ProductSchema.index({ category: 1 });
-// ProductSchema.index({ deletedAt: 1 });
 
-// ProductSchema.pre<IProduct>("save", async function () {
-//   if (!this.variants) return; 
-
-//   if (this.isModified("variants") || this.isModified("basePrice")) {
-    
-//     // 2. Use a local constant to help TypeScript's "Control Flow Analysis"
-//     const variantsArray = this.variants;
-
-//     if (variantsArray.length > 0) {
-//       this.stock = variantsArray.reduce(
-//         (acc, variant) => acc + (variant.stock ?? 0),
-//         0
-//       );
-
-//       // 4. Safely check for the first variant's SKU
-//       if (!this.sku && variantsArray[0]) {
-//         this.sku = variantsArray[0].sku;
-//       }
-//     }
-//   }
-// });
 export const Product = model<IProduct>("Product", ProductSchema);
