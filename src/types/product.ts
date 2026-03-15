@@ -11,3 +11,17 @@ export interface ProductPayload {
   isActive: boolean;
   tags: string[]
 }
+
+
+export interface UpdateProductPayload {
+  name?: string;
+  description?: string;
+  basePrice?: number;
+  comparePrice?: number | null; // null = explicitly remove comparePrice
+  category?: string;
+  variants?: any[];
+  specifications?: Record<string, string>;
+  tags?: string[];
+  stock?: number;
+  removeImageIds?: string[]; // Cloudinary public_ids the client wants removed
+}

@@ -114,4 +114,20 @@ export const createProductSchema = z.object({
   }),
 });
 
+export const updateProductStatusSchema = z.object({
+  params: z.object({
+    productId: z.string({ message: "productId must be of type string" }),
+  }),
+  body: z
+    .object({
+      isActive: z.boolean().optional(),
+      isFeatured: z.boolean().optional(),
+    })
+    .refine((data) => Object.values(data).some((v) => v !== undefined), {
+      message: "At least one field must be provided",
+    }),
+});
+
+
 export type CreateProductInput = z.infer<typeof createProductSchema>["body"];
+export type UpdateProductInput = z.infer<typeof updateProductStatusSchema>["body"];

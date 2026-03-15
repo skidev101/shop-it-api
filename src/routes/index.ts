@@ -1,16 +1,17 @@
 import { Router, Request, Response } from "express";
-import authRoutes from "./auth"
-import productRoutes from "./product"
-import categoryRoutes from "./category"
-const router: Router = Router()
+import authRoutes from "./auth.routes";
+import publicProductRoutes from "./public/product.public.routes";
+import adminProductRoutes from "./admin/product.admin.routes";
+import publicCategoryRoutes from "./public/category.public.routes";
+import adminCategoryRoutes from "./admin/category.admin.routes";
 
-
+const router: Router = Router();
 
 router.get("/", (_req: Request, res: Response) => {
   res.json({
     message: "shop-it API",
-    version: "1.0"
-  })
+    version: "1.0",
+  });
 });
 
 router.get("/health", (_req: Request, res: Response) => {
@@ -19,11 +20,16 @@ router.get("/health", (_req: Request, res: Response) => {
     version: "1.0",
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-  })
+  });
 });
 
+// public routes
 router.use("/auth", authRoutes);
-router.use("/product", productRoutes);
-router.use("/category", categoryRoutes);
+router.use("/product", publicProductRoutes);
+router.use("/category", publicCategoryRoutes);
+
+// admin routes
+router.use("/admin/product", adminProductRoutes);
+router.use("/admin/category", adminCategoryRoutes);
 
 export default router;

@@ -18,20 +18,18 @@ export const createProduct = asyncHandler(
   },
 );
 
-export const getProducts = asyncHandler(
-  async (req: AuthRequest, res: Response) => {
-    const query = req.query;
-    const result = await productService.getProducts(query);
+export const getProducts = asyncHandler(async (req: Request, res: Response) => {
+  const query = req.query;
+  const result = await productService.getProducts(query);
 
-    return res.status(201).json(result);
-  },
-);
+  return res.status(201).json(result);
+});
 
 export const getProductBySlug = asyncHandler(
   async (req: Request, res: Response) => {
     const slug = req.params.slug;
     if (!slug || typeof slug !== "string") {
-      return res.status(400).json({ message: "Product slug is required"})
+      return res.status(400).json({ message: "Product slug is required" });
     }
     const result = await productService.getProductBySlug(slug);
 
@@ -39,7 +37,21 @@ export const getProductBySlug = asyncHandler(
   },
 );
 
+export const updateProductStatus = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const { productId } = req.params as { productId: string };
+    const updates = req.body;
 
+    const result = await productService.updateProductStatus(
+      userId,
+      productId,
+      updates,
+    );
+
+    return res.status(200).json(result);
+  },
+);
 
 export const softDeleteProduct = asyncHandler(
   async (req: AuthRequest, res: Response) => {

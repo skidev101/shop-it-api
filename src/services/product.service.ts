@@ -1,13 +1,18 @@
 import mongoose from "mongoose";
 import { IProduct, Product, User } from "../models";
-import { ProductPayload } from "../types/product";
-import { NotFoundError, UnauthorizedError } from "../utils/api-errors";
+import { ProductPayload, UpdateProductPayload } from "../types/product";
+import {
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from "../utils/api-errors";
 import { SuccessRes } from "../utils/responses";
 import slugify from "slugify";
 import { logger } from "../lib/logger";
 import { CloudinaryUtil } from "../utils/cloudinary";
 import { nanoid } from "nanoid";
 import { imageCleanupQueue } from "../queues/imageCleanup.queue";
+import { CreateProductInput } from "../validators/product.validator";
 
 export interface ProductQuery {
   page?: number;
@@ -140,7 +145,8 @@ export class ProductService {
       filter.category = new mongoose.Types.ObjectId(category);
     }
 
-    const featureValue = isFeatured === 'true' ? true : isFeatured === 'false' ? false : undefined;
+    const featureValue =
+      isFeatured === "true" ? true : isFeatured === "false" ? false : undefined;
     if (typeof featureValue === "boolean") {
       filter.isFeatured = isFeatured;
     }
@@ -168,7 +174,7 @@ export class ProductService {
 
     const total = await Product.countDocuments(filter);
 
-    console.log("products fetched:", products)
+    console.log("products fetched:", products);
 
     const formattedResponse = products.map((product: IProduct) => {
       const productData = product.toObject();
@@ -213,10 +219,180 @@ export class ProductService {
       throw new NotFoundError("Product not found");
     }
 
-    return product;
+    return SuccessRes({
+      message: "Product fetched",
+      data: product,
+      statusCode: 200,
+    });
   }
 
-  
+  async updateProduct(
+    productId: string,
+    data: UpdateProductPayload,
+    userId: string,
+    files: Express.Multer.File[],
+  ) {
+    // ── 1. Validate caller ──────────────────────────────────────────────────
+    const user = await User.findOne({ _id: userId }).lean();
+    if (!user) throw new NotFoundError("User");
+    if (!user.isVerified)
+      throw new UnauthorizedError("User account not verified");
+    if (user.isSuspended) throw new UnauthorizedError("User account suspended");
+
+    // ── 2. Fetch product (exclude soft-deleted) ─────────────────────────────
+    const product = await Product.findOne({ _id: productId, isDeleted: false });
+    if (!product) throw new NotFoundError("Product");
+
+    // ── 3. Ownership guard ───────────────────────────────────────────────────
+    // For admin-level overrides, handle this in the authorize middleware
+    // and pass a bypass flag rather than loosening this check here.
+    if (product.uploadedBy.toString() !== userId) {
+      throw new UnauthorizedError("You do not own this product");
+    }
+
+    // ── 4. Map incoming uploads ─────────────────────────────────────────────
+    const newImages =
+      files?.map((file) => ({
+        url: file.path,
+        public_id: file.filename,
+      })) ?? [];
+
+    // Collect public_ids to remove from Cloudinary only AFTER DB write succeeds.
+    // Staged here so cleanup is never attempted if we throw before saving.
+    const stagedCloudinaryDeletes: string[] = [];
+
+    try {
+      // ── 5. Scalar fields ────────────────────────────────────────────────────
+      // Mutate the Mongoose document directly so pre('save') hooks fire
+      // (stock recalculation from variants lives there).
+
+      if (data.name !== undefined) {
+        product.name = data.name;
+        // Pass current productId so the slug check doesn't conflict with itself
+        product.slug = await this.generateUniqueSlug(data.name);
+      }
+
+      if (data.description !== undefined)
+        product.description = data.description;
+      if (data.basePrice !== undefined) product.basePrice = data.basePrice;
+      if (data.tags !== undefined) product.tags = data.tags;
+      if (data.specifications !== undefined)
+        product.specifications = data.specifications;
+      if (data.stock !== undefined) product.stock = data.stock;
+
+      if (data.category !== undefined) {
+        product.category = new mongoose.Types.ObjectId(data.category as string);
+      }
+
+      // null = client explicitly wants to remove the comparePrice field
+      if (data.comparePrice !== undefined) {
+        if (data.comparePrice === null) {
+          product.comparePrice = undefined;
+        } else {
+          product.comparePrice = data.comparePrice;
+        }
+      }
+
+      // ── 6. SKU — regenerate only when identity fields actually changed ─────
+      if (data.name !== undefined || data.category !== undefined) {
+        const nameForSku = data.name ?? product.name;
+        const categoryForSku = String(data.category ?? product.category);
+        product.sku = this.generateSku(nameForSku, categoryForSku);
+      }
+
+      // ── 7. Variants ─────────────────────────────────────────────────────────
+      if (data.variants !== undefined) {
+        // Validator enforces min(1), but guard defensively in the service too
+        if (data.variants.length === 0) {
+          throw new ValidationError("A product must have at least one variant");
+        }
+        product.variants = data.variants as any;
+        // pre('save') will recalculate stock from variants automatically
+      }
+
+      // ── 8. Image removal ────────────────────────────────────────────────────
+      if (data.removeImageIds?.length) {
+        const remainingImages = product.images.filter(
+          (img) => !data.removeImageIds!.includes(img.public_id),
+        );
+
+        // Never leave a product with zero images
+        const incomingCount = newImages.length;
+        if (remainingImages.length + incomingCount === 0) {
+          throw new ValidationError("A product must retain at least one image");
+        }
+
+        // Stage for Cloudinary — only executed after successful DB write
+        stagedCloudinaryDeletes.push(...data.removeImageIds);
+        product.images = remainingImages;
+      }
+
+      // ── 9. Append new images ────────────────────────────────────────────────
+      if (newImages.length > 0) {
+        product.images.push(...newImages);
+      }
+
+      // ── 10. Persist — triggers pre('save') hooks ────────────────────────────
+      await product.save();
+
+      // ── 11. Post-commit Cloudinary cleanup ──────────────────────────────────
+      // Runs AFTER the DB write succeeds. Failure here is non-fatal — we log
+      // and continue rather than rolling back a successful update.
+      if (stagedCloudinaryDeletes.length > 0) {
+        await CloudinaryUtil.deleteMultipleFiles(stagedCloudinaryDeletes).catch(
+          (err) =>
+            logger.error(
+              "Post-commit Cloudinary cleanup failed. Orphaned public_ids: %o",
+              stagedCloudinaryDeletes,
+              err,
+            ),
+        );
+      }
+
+      return SuccessRes({
+        message: "Product updated",
+        data: { product: product.toObject() },
+        statusCode: 200,
+      });
+    } catch (error: any) {
+      // Roll back ONLY images that were newly uploaded in this request.
+      // Do NOT touch stagedCloudinaryDeletes — the DB write failed so
+      // those images are still referenced by the product document.
+      if (newImages.length > 0) {
+        logger.error(
+          "DB error during product update. Rolling back %d new upload(s)...",
+          newImages.length,
+        );
+        await CloudinaryUtil.deleteMultipleFiles(
+          newImages.map((img) => img.public_id),
+        ).catch((err) => logger.error("Upload rollback failed", err));
+      }
+
+      throw error;
+    }
+  }
+
+  async updateProductStatus(
+    userId: string,
+    productId: string,
+    updates: Partial<Pick<IProduct, "isActive" | "isFeatured">>,
+  ) {
+    const product = await Product.findOneAndUpdate(
+      { _id: productId, uploadedBy: userId },
+      { $set: updates },
+      { new: true, runValidators: true },
+    );
+
+    logger.info(`Product ${productId} updated by ${userId}`);
+
+    if (!product) throw new NotFoundError("Product not found");
+
+    return SuccessRes({
+      message: "Product updated",
+      data: product,
+      statusCode: 200,
+    });
+  }
 
   async softDeleteProduct(productId: string, userId: string) {
     const product = await Product.findOneAndUpdate(

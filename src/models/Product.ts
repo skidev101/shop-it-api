@@ -15,7 +15,7 @@ export interface IProduct extends Document {
   slug: string;
   description: string;
   basePrice: number;
-  comparePrice?: number;
+  comparePrice?: number | undefined;
   sku: string;
   stock: number;
   category: Types.ObjectId;
@@ -158,7 +158,7 @@ const ProductSchema = new Schema<IProduct>(
     },
     isDeleted: {
       type: Boolean,
-      default: false
+      default: false,
     },
     deletedAt: {
       type: Date,
@@ -176,4 +176,25 @@ ProductSchema.index(
 // ProductSchema.index({ category: 1 });
 // ProductSchema.index({ deletedAt: 1 });
 
+// ProductSchema.pre<IProduct>("save", async function () {
+//   if (!this.variants) return; 
+
+//   if (this.isModified("variants") || this.isModified("basePrice")) {
+    
+//     // 2. Use a local constant to help TypeScript's "Control Flow Analysis"
+//     const variantsArray = this.variants;
+
+//     if (variantsArray.length > 0) {
+//       this.stock = variantsArray.reduce(
+//         (acc, variant) => acc + (variant.stock ?? 0),
+//         0
+//       );
+
+//       // 4. Safely check for the first variant's SKU
+//       if (!this.sku && variantsArray[0]) {
+//         this.sku = variantsArray[0].sku;
+//       }
+//     }
+//   }
+// });
 export const Product = model<IProduct>("Product", ProductSchema);
