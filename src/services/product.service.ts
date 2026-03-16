@@ -81,7 +81,6 @@ export class ProductService {
         basePrice: data.basePrice,
         category: data.category,
         images: imageObjects,
-        variants: data.variants,
         specifications: data.specifications,
         tags: data.tags,
         stock: data.stock,
@@ -89,17 +88,6 @@ export class ProductService {
         isFeatured: false,
       };
 
-      if (!productData.variants || productData.variants.length === 0) {
-        productData.variants = [
-          {
-            sku: productData.sku,
-            price: productData.basePrice,
-            stock: productData.stock,
-            attributes: [],
-            images: [],
-          },
-        ];
-      }
 
       if (data.comparePrice !== undefined) {
         productData.comparePrice = data.comparePrice;
@@ -119,8 +107,10 @@ export class ProductService {
     } catch (error: any) {
       if (imageObjects.length > 0) {
         logger.error("DB error creating product. Cleaning up images...");
-        const publicIds = imageObjects.map((img: any) => img.public_id);
-        await CloudinaryUtil.deleteMultipleFiles(publicIds);
+        await this.queue.add("create-product-images", {
+          productId: "failed-product-id",
+          publicIds: imageObjects.map((img) => img.public_id),
+        });
       }
 
       throw error;
@@ -231,9 +221,9 @@ export class ProductService {
   }
 
   async updateProduct(
+    userId: string,
     productId: string,
     data: UpdateProductPayload,
-    userId: string,
     files: Express.Multer.File[],
   ) {
     const user = await User.findOne({ _id: userId }).lean();

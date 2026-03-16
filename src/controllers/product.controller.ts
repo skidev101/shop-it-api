@@ -37,6 +37,25 @@ export const getProductBySlug = asyncHandler(
   },
 );
 
+export const updateProduct = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const { productId } = req.params as { productId: string };
+    const updates = req.body;
+
+    const files = req.files as Express.Multer.File[];
+
+    const result = await productService.updateProduct(
+      userId,
+      productId,
+      updates,
+      files,
+    );
+
+    return res.status(200).json(result);
+  },
+);
+
 export const updateProductStatus = asyncHandler(
   async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;

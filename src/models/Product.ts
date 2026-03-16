@@ -61,6 +61,7 @@ const ProductSchema = new Schema<IProduct>(
       type: String,
       required: true,
       trim: true,
+      unique: true
     },
     stock: {
       type: Number,
