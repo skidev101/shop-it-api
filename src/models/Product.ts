@@ -6,7 +6,7 @@ export interface IProduct extends Document {
   slug: string;
   description: string;
   basePrice: number;
-  comparePrice?: number;
+  comparePrice?: number | undefined;
   sku: string;        // base/default SKU — variants carry their own
   stock: number;      // denormalized total; sum of all variant stocks
   category: Types.ObjectId;

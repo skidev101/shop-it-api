@@ -1,12 +1,11 @@
 import dotenv from "dotenv";
 dotenv.config({ quiet: true });
 
-import express, { NextFunction, Request, Response, Express } from "express";
+import express, { Express } from "express";
 import { env } from "./src/config/env";
 import cors from "cors";
 import router from "./src/routes";
 import cookieParser from "cookie-parser";
-import { requestLogger } from "./src/middlewares/requestLogger.middleware";
 import { logger } from "./src/lib/logger";
 import {
   errorHandler,
@@ -17,6 +16,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import compression from "compression";
 import { setupSwagger } from "./src/config/swagger";
+import { setupImageWorker } from "./src/workers/imageCleanup.worker";
 
 const app: Express = express();
 const PORT = env.PORT;
@@ -58,6 +58,7 @@ app.use(errorHandler);
 async function startServer() {
   try {
     await connectDB();
+    setupImageWorker();
 
     app.listen(PORT, () => {
       const envLabel = env.IS_PROD ? "PRODUCTION" : "DEVELOPMENT";

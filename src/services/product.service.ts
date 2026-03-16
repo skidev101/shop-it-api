@@ -13,6 +13,8 @@ import { CloudinaryUtil } from "../utils/cloudinary";
 import { nanoid } from "nanoid";
 import { imageCleanupQueue } from "../queues/imageCleanup.queue";
 import { CreateProductInput } from "../validators/product.validator";
+import { Queue } from "bullmq";
+import { threadCpuUsage } from "node:process";
 
 export interface ProductQuery {
   page?: number;
@@ -26,6 +28,8 @@ export interface ProductQuery {
 }
 
 export class ProductService {
+  constructor(private readonly queue: Queue) {}
+
   private async generateUniqueSlug(name: string) {
     const slug = `${slugify(name, { lower: true, strict: true })}-${nanoid(6)}`;
 
@@ -232,43 +236,30 @@ export class ProductService {
     userId: string,
     files: Express.Multer.File[],
   ) {
-    // ── 1. Validate caller ──────────────────────────────────────────────────
     const user = await User.findOne({ _id: userId }).lean();
     if (!user) throw new NotFoundError("User");
     if (!user.isVerified)
       throw new UnauthorizedError("User account not verified");
     if (user.isSuspended) throw new UnauthorizedError("User account suspended");
 
-    // ── 2. Fetch product (exclude soft-deleted) ─────────────────────────────
     const product = await Product.findOne({ _id: productId, isDeleted: false });
     if (!product) throw new NotFoundError("Product");
 
-    // ── 3. Ownership guard ───────────────────────────────────────────────────
-    // For admin-level overrides, handle this in the authorize middleware
-    // and pass a bypass flag rather than loosening this check here.
     if (product.uploadedBy.toString() !== userId) {
       throw new UnauthorizedError("You do not own this product");
     }
 
-    // ── 4. Map incoming uploads ─────────────────────────────────────────────
     const newImages =
       files?.map((file) => ({
         url: file.path,
         public_id: file.filename,
       })) ?? [];
 
-    // Collect public_ids to remove from Cloudinary only AFTER DB write succeeds.
-    // Staged here so cleanup is never attempted if we throw before saving.
     const stagedCloudinaryDeletes: string[] = [];
 
     try {
-      // ── 5. Scalar fields ────────────────────────────────────────────────────
-      // Mutate the Mongoose document directly so pre('save') hooks fire
-      // (stock recalculation from variants lives there).
-
       if (data.name !== undefined) {
         product.name = data.name;
-        // Pass current productId so the slug check doesn't conflict with itself
         product.slug = await this.generateUniqueSlug(data.name);
       }
 
@@ -293,60 +284,37 @@ export class ProductService {
         }
       }
 
-      // ── 6. SKU — regenerate only when identity fields actually changed ─────
       if (data.name !== undefined || data.category !== undefined) {
         const nameForSku = data.name ?? product.name;
         const categoryForSku = String(data.category ?? product.category);
         product.sku = this.generateSku(nameForSku, categoryForSku);
       }
 
-      // ── 7. Variants ─────────────────────────────────────────────────────────
-      if (data.variants !== undefined) {
-        // Validator enforces min(1), but guard defensively in the service too
-        if (data.variants.length === 0) {
-          throw new ValidationError("A product must have at least one variant");
-        }
-        product.variants = data.variants as any;
-        // pre('save') will recalculate stock from variants automatically
-      }
-
-      // ── 8. Image removal ────────────────────────────────────────────────────
       if (data.removeImageIds?.length) {
         const remainingImages = product.images.filter(
           (img) => !data.removeImageIds!.includes(img.public_id),
         );
 
-        // Never leave a product with zero images
         const incomingCount = newImages.length;
         if (remainingImages.length + incomingCount === 0) {
           throw new ValidationError("A product must retain at least one image");
         }
 
-        // Stage for Cloudinary — only executed after successful DB write
         stagedCloudinaryDeletes.push(...data.removeImageIds);
         product.images = remainingImages;
       }
 
-      // ── 9. Append new images ────────────────────────────────────────────────
       if (newImages.length > 0) {
         product.images.push(...newImages);
       }
 
-      // ── 10. Persist — triggers pre('save') hooks ────────────────────────────
       await product.save();
 
-      // ── 11. Post-commit Cloudinary cleanup ──────────────────────────────────
-      // Runs AFTER the DB write succeeds. Failure here is non-fatal — we log
-      // and continue rather than rolling back a successful update.
       if (stagedCloudinaryDeletes.length > 0) {
-        await CloudinaryUtil.deleteMultipleFiles(stagedCloudinaryDeletes).catch(
-          (err) =>
-            logger.error(
-              "Post-commit Cloudinary cleanup failed. Orphaned public_ids: %o",
-              stagedCloudinaryDeletes,
-              err,
-            ),
-        );
+        await this.queue.add("delete-old-images", {
+          productId,
+          publicIds: stagedCloudinaryDeletes,
+        });
       }
 
       return SuccessRes({
@@ -355,17 +323,15 @@ export class ProductService {
         statusCode: 200,
       });
     } catch (error: any) {
-      // Roll back ONLY images that were newly uploaded in this request.
-      // Do NOT touch stagedCloudinaryDeletes — the DB write failed so
-      // those images are still referenced by the product document.
       if (newImages.length > 0) {
         logger.error(
-          "DB error during product update. Rolling back %d new upload(s)...",
+          "DB error during product update. Rolling back new upload(s)...",
           newImages.length,
         );
-        await CloudinaryUtil.deleteMultipleFiles(
-          newImages.map((img) => img.public_id),
-        ).catch((err) => logger.error("Upload rollback failed", err));
+        await this.queue.add("rollback-new-images", {
+          productId,
+          publicIds: newImages.map((img) => img.public_id),
+        });
       }
 
       throw error;
@@ -430,12 +396,7 @@ export class ProductService {
         throw new NotFoundError("Product not found or unauthorized");
       }
 
-      const publicIds = [
-        ...product.images?.map((img) => img.public_id),
-        ...(product.variants ?? []).flatMap((v) =>
-          v.images?.map((img) => img.public_id),
-        ),
-      ];
+      const publicIds = [...product.images?.map((img) => img.public_id)];
 
       await Product.updateOne(
         { _id: productId },
@@ -443,20 +404,10 @@ export class ProductService {
       );
 
       if (publicIds.length > 0) {
-        await imageCleanupQueue.add(
-          "delete-product-images",
-          { publicIds, productId },
-          {
-            jobId: `product-delete-${productId}-${Date.now()}`,
-            attempts: 5,
-            backoff: {
-              type: "exponential",
-              delay: 5000,
-            },
-            removeOnComplete: true,
-            removeOnFail: 1000,
-          },
-        );
+        await this.queue.add("delete-product-images", {
+          productId,
+          publicIds: publicIds,
+        });
       }
 
       return SuccessRes({
@@ -470,5 +421,5 @@ export class ProductService {
   }
 }
 
-const productService = new ProductService();
+const productService = new ProductService(imageCleanupQueue);
 export default productService;
