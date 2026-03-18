@@ -108,7 +108,7 @@ export class ProductService {
       if (imageObjects.length > 0) {
         logger.error("DB error creating product. Cleaning up images...");
         await this.queue.add("create-product-images", {
-          productId: "failed-product-id",
+          productId: "failed-create-product-id",
           publicIds: imageObjects.map((img) => img.public_id),
         });
       }
