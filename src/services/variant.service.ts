@@ -1,7 +1,11 @@
 import { Queue } from "bullmq";
 import { logger } from "../lib/logger";
 import { Product, User, Variant } from "../models";
-import { NotFoundError, UnauthorizedError } from "../utils/api-errors";
+import {
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from "../utils/api-errors";
 import { SuccessRes } from "../utils/responses";
 
 export class VariantService {
@@ -42,6 +46,13 @@ export class VariantService {
       throw new UnauthorizedError("User account suspended");
     }
 
+    const existingVariant = await Variant.findOne({
+      product: productId,
+      attributes: data.attributes,
+    });
+    if (existingVariant)
+      throw new ValidationError("Variant with these attributes already exists");
+
     try {
       const sku = this.generateSku(product.slug, data.attributes);
 
@@ -81,5 +92,48 @@ export class VariantService {
 
       throw error;
     }
+  }
+
+  async adjustStock(variantId: string, amount: number) {
+    const update = await Variant.findByIdAndUpdate(
+      variantId,
+      { $inc: { stock: amount } },
+      { new: true },
+    );
+    if (!update) throw new NotFoundError("Variant");
+
+    if (update.stock <= 0) {
+      await Variant.findByIdAndUpdate(variantId, { isActive: false });
+    }
+
+    return SuccessRes({
+      message: "Variant updated",
+      statusCode: 200,
+    });
+  }
+
+  async archiveVariant(variantId: string) {
+    const update = await Variant.findByIdAndUpdate(variantId, {
+      isActive: false,
+    });
+    if (!update) throw new NotFoundError("Variant");
+
+    return SuccessRes({
+      message: "Variant updated",
+      statusCode: 200,
+    });
+  }
+
+  async bulkUpdateStatus(variantIds: string[], isActive: boolean) {
+    const update = await Variant.updateMany(
+      { _id: { $in: variantIds } },
+      { $set: { isActive } },
+    );
+    if (!update) throw new NotFoundError("Variant");
+
+    return SuccessRes({
+      message: "Variant updated",
+      statusCode: 200,
+    });
   }
 }

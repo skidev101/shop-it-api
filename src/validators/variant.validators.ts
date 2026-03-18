@@ -1,15 +1,23 @@
-import z from "zod";
+import { z } from "zod";
+import { Types } from "mongoose";
+
+const objectIdSchema = z.string().refine((val) => Types.ObjectId.isValid(val), {
+  message: "Invalid MongoDB ID format",
+});
 
 export const createVariantSchema = z.object({
+  params: z.object({
+    productId: objectIdSchema,
+  }),
   body: z.object({
-    productId: z.string().min(4, "ProductId must be at least 3 characers"),
-    attributes: z.array(
-      z.object({
-        name: z.string().min(3, "Attribute name is too short"),
-        value: z.string().min(3, "Attribute value is too short"),
-      }),
-    ),
-    price: z.coerce.number().positive(),
-    stock: z.coerce.number().int().positive(),
+    price: z.number().positive(),
+    stock: z.number().int().min(0),
+    attributes: z.record(z.string(), z.string()).transform((attr) => {
+      const normalized: Record<string, string> = {};
+      for (const [key, value] of Object.entries(attr)) {
+        normalized[key.trim().toLowerCase()] = value.trim().toLowerCase();
+      }
+      return normalized;
+    }),
   }),
 });
