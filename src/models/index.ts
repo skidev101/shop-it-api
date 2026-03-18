@@ -7,6 +7,7 @@ export { Coupon, ICoupon } from "./Coupon";
 export { Order, IOrder } from "./Order";
 export { Otp, IOtp } from "./Otp";
 export { Payment, IPayment } from "./Payment";
+export { Variant, IVariant } from "./Variant";
 export { Product, IProduct } from "./Product";
 export { RefreshToken, IRefreshToken } from "./RefreshToken";
 export { Review, IReview } from "./Review";

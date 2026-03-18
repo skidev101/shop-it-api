@@ -6,7 +6,7 @@ export interface IVariant extends Document {
   attributes: Array<{ name: string; value: string }>;
   price?: number;
   stock: number;
-  images: Array<{ url: string; public_id: string }>;
+  image: { url: string; public_id: string };
   isActive: boolean;
   isDeleted: boolean;
   deletedAt: Date | null;
@@ -45,12 +45,10 @@ const VariantSchema = new Schema<IVariant>(
       min: 0,
       default: 0,
     },
-    images: [
-      {
-        url: { type: String, required: true },
-        public_id: { type: String, required: true },
-      },
-    ],
+    image: {
+      url: { type: String, required: true },
+      public_id: { type: String, required: true },
+    },
     isActive: {
       type: Boolean,
       default: true,

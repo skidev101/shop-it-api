@@ -88,7 +88,6 @@ export class ProductService {
         isFeatured: false,
       };
 
-
       if (data.comparePrice !== undefined) {
         productData.comparePrice = data.comparePrice;
       }
@@ -98,7 +97,7 @@ export class ProductService {
       const product = await Product.create(productData);
 
       return SuccessRes({
-        message: "New Product added",
+        message: "New Product created",
         data: {
           product: product.toObject(),
         },
@@ -207,7 +206,8 @@ export class ProductService {
   async getProductBySlug(slug: string) {
     const product = await Product.findOne({ slug, isActive: true })
       .populate("category")
-      .populate("uploadedBy", "name email");
+      .populate("uploadedBy", "name email")
+      .populate({ path: "variants", match: { isActive: true } });
 
     if (!product) {
       throw new NotFoundError("Product not found");
