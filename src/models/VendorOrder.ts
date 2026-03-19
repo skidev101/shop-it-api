@@ -5,11 +5,13 @@ export interface IVendorOrder extends Document {
   storeId: Types.ObjectId;
   items: {
     productId: Types.ObjectId;
-    variantId: Types.ObjectId;
+    variantId?: Types.ObjectId | null;
     quantity: number;
     price: number;
   }[];
   subTotal: number;
+  platformFee: number;
+  vendorNet: number;
   status: "processing" | "shipped" | "delivered" | "cancelled";
 }
 
@@ -34,6 +36,8 @@ const VendorOrderSchema = new Schema<IVendorOrder>(
       },
     ],
     subTotal: Number,
+    platformFee: Number,
+    vendorNet: Number,
     status: {
       type: String,
       default: "processing",

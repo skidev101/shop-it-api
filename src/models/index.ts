@@ -2,9 +2,12 @@
 
 export { User, IUser } from "./User";
 export { Cart, ICart } from "./Cart";
+export { CartItem, ICartItem } from "./CartItem";
 export { Category, ICategory } from "./Category";
 export { Coupon, ICoupon } from "./Coupon";
 export { Order, IOrder } from "./Order";
+export { VendorOrder, IVendorOrder } from "./VendorOrder";
+export { OrderItem, IOrderItem } from "./OrderItem";
 export { Otp, IOtp } from "./Otp";
 export { Payment, IPayment } from "./Payment";
 export { Variant, IVariant } from "./Variant";

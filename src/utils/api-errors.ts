@@ -41,6 +41,12 @@ export class ForbiddenError extends ApiError {
   }
 }
 
+export class ServerError extends ApiError {
+  constructor(message: string = "Internal server error") {
+    super(500, message, true, "INTERNAL_SERVER_ERROR");
+  }
+}
+
 export class InsufficientStockError extends ApiError {
   constructor(productId: string, available: number, requested: number) {
     super(
