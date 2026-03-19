@@ -1,17 +1,17 @@
 import { Document, Schema, Types, model } from "mongoose";
 
 export interface IProduct extends Document {
-  uploadedBy: Types.ObjectId;
+  storeId: Types.ObjectId;
   name: string;
   slug: string;
   description: string;
   basePrice: number;
   comparePrice?: number | undefined;
-  sku: string;        // base/default SKU — variants carry their own
-  stock: number;      // denormalized total; sum of all variant stocks
+  sku: string;        
+  stock: number;     
   category: Types.ObjectId;
   images: Array<{ url: string; public_id: string }>;
-  variants: Types.ObjectId[];  // refs to Variant documents
+  variants: Types.ObjectId[];  
   specifications: Record<string, string>;
   tags: string[];
   isActive: boolean;
@@ -26,10 +26,10 @@ export interface IProduct extends Document {
 
 const ProductSchema = new Schema<IProduct>(
   {
-    uploadedBy: {
+    storeId: {
       type: Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "UserId is required"],
+      ref: "Store",
+      required: [true, "StoreId is required"],
       index: true,
     },
     name: {
