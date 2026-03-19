@@ -8,7 +8,11 @@ import {
   VendorOrder,
   ICartItem,
 } from "../models";
-import { ApiError, NotFoundError, ServerError, ValidationError } from "../utils/api-errors";
+import {
+  NotFoundError,
+  ServerError,
+  ValidationError,
+} from "../utils/api-errors";
 
 class OrderService {
   private async getCartId(userId: string) {
@@ -85,7 +89,7 @@ class OrderService {
       );
       const parentOrder = createdOrders[0];
       if (!parentOrder) {
-        throw new ServerError("Failed to initialize order")
+        throw new ServerError("Failed to initialize order");
       }
 
       const itemsByStore: Record<string, ICartItem[]> =
@@ -106,7 +110,9 @@ class OrderService {
                 storeId: new mongoose.Types.ObjectId(storeId),
                 items: items.map((item) => ({
                   productId: item.productId,
-                  variantId: item.variantId ? new mongoose.Types.ObjectId(item.variantId) : null,
+                  variantId: item.variantId
+                    ? new mongoose.Types.ObjectId(item.variantId)
+                    : null,
                   quantity: item.quantity,
                   price: item.priceAtAdd,
                 })),
@@ -123,9 +129,7 @@ class OrderService {
 
       await Promise.all(vendorOrderPromises);
 
-      await CartItem.deleteMany({ cartId }).session(
-        session,
-      );
+      await CartItem.deleteMany({ cartId }).session(session);
 
       await session.commitTransaction();
       return parentOrder;
@@ -137,3 +141,8 @@ class OrderService {
     }
   }
 }
+
+
+
+const orderService = new OrderService();
+export default orderService

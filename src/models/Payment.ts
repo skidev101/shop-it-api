@@ -3,7 +3,6 @@ import { Document, model, Schema, Types } from "mongoose";
 
 
 export interface IPayment extends Document {
-  _id: Types.ObjectId;
   orderId: Types.ObjectId;
   userId: Types.ObjectId;
   amount: number;
