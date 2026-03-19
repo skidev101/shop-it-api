@@ -233,7 +233,7 @@ export class ProductService {
     const product = await Product.findOne({ _id: productId, isDeleted: false });
     if (!product) throw new NotFoundError("Product");
 
-    if (product.uploadedBy.toString() !== userId) {
+    if (product.storeId.toString() !== userId) {
       throw new UnauthorizedError("You do not own this product");
     }
 

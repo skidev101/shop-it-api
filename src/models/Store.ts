@@ -8,7 +8,7 @@ export interface IStore extends Document {
   description: string;
   status: "pending" | "active" | "suspended";
   balance: number;
-  verified: boolean;
+  isVerified: boolean;
 }
 
 const StoreSchema = new Schema<IStore>(
@@ -40,14 +40,17 @@ const StoreSchema = new Schema<IStore>(
         default: "",
       },
     },
-    description: String,
+    description: {
+      type: String,
+      required: true,
+    },
     status: {
       type: String,
       enum: ["pending", "active", "suspended"],
       default: "pending",
     },
     balance: { type: Number, default: 0 },
-    verified: { type: Boolean, default: false },
+    isVerified: { type: Boolean, default: false },
   },
   { timestamps: true },
 );
