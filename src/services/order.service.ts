@@ -7,8 +7,10 @@ import {
   Variant,
   VendorOrder,
   ICartItem,
+  IProduct,
 } from "../models";
 import {
+  InsufficientStockError,
   NotFoundError,
   ServerError,
   ValidationError,
@@ -61,19 +63,40 @@ class OrderService {
     try {
       const cartId = await this.getCartId(userId);
       const cartItems = await CartItem.find({ cartId })
-        .populate("productId", "name basePrice stock storeId")
+        .populate<{ productId: IProduct }>("productId")
         .session(session);
-
       if (!cartItems.length) throw new ValidationError("Cart is empty");
 
+      const productIds = cartItems.map((i) => i.productId);
+
+      const stockOps = [];
+      let totalAmount = 0;
+
       for (const item of cartItems) {
-        await this.handleStockReduction(item, session);
+        const product = item.productId;
+        if (!product) throw new NotFoundError(`Product ${item.productId}`);
+        if (product.stock < item.quantity) {
+          throw new InsufficientStockError(
+            item.productId.toString(),
+            product.stock,
+            item.quantity,
+          );
+        }
+
+        totalAmount += product.basePrice * item.quantity;
+
+        stockOps.push({
+          updateOne: {
+            filter: { _id: product._id, stock: { $gte: item.quantity } },
+            update: { $inc: { stock: -item.quantity } },
+          },
+        });
       }
 
-      const totalAmount = cartItems.reduce(
-        (sum, item) => sum + item.priceAtAdd * item.quantity,
-        0,
-      );
+      const result = await Product.bulkWrite(stockOps, { session });
+      if (result.modifiedCount !== stockOps.length) {
+        throw new ValidationError("Stock sync failed. Item already purchased");
+      }
 
       const createdOrders = await Order.create(
         [
@@ -95,7 +118,7 @@ class OrderService {
       const itemsByStore: Record<string, ICartItem[]> =
         this.groupItemsByStore(cartItems);
 
-      const vendorOrderPromises = Object.entries(itemsByStore).map(
+      const vendorOrderData = Object.entries(itemsByStore).map(
         ([storeId, items]) => {
           const subTotal = items.reduce(
             (sum, item) => sum + item.priceAtAdd * item.quantity,
@@ -103,31 +126,26 @@ class OrderService {
           );
           const platformFee = subTotal * 0.1;
 
-          return VendorOrder.create(
-            [
-              {
-                parentOrderId: parentOrder._id,
-                storeId: new mongoose.Types.ObjectId(storeId),
-                items: items.map((item) => ({
-                  productId: item.productId,
-                  variantId: item.variantId
-                    ? new mongoose.Types.ObjectId(item.variantId)
-                    : null,
-                  quantity: item.quantity,
-                  price: item.priceAtAdd,
-                })),
-                subTotal: subTotal,
-                platformFee,
-                vendorNet: subTotal - platformFee,
-                status: "processing",
-              },
-            ],
-            { session },
-          );
+          return {
+            parentOrderId: parentOrder._id,
+            storeId: new mongoose.Types.ObjectId(storeId),
+            items: items.map((item) => ({
+              productId: item.productId,
+              variantId: item.variantId
+                ? new mongoose.Types.ObjectId(item.variantId)
+                : null,
+              quantity: item.quantity,
+              price: item.priceAtAdd,
+            })),
+            subTotal: subTotal,
+            platformFee,
+            vendorNet: subTotal - platformFee,
+            status: "processing",
+          };
         },
       );
 
-      await Promise.all(vendorOrderPromises);
+      await VendorOrder.insertMany(vendorOrderData, { session });
 
       await CartItem.deleteMany({ cartId }).session(session);
 
@@ -142,7 +160,5 @@ class OrderService {
   }
 }
 
-
-
 const orderService = new OrderService();
-export default orderService
+export default orderService;
