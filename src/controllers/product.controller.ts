@@ -2,17 +2,27 @@ import { Request, Response } from "express";
 import { asyncHandler } from "../middlewares/errorHandler.middleware";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import productService from "../services/product.service";
+import { StoreRequest } from "../middlewares/injectStore.middleware";
 
 export const createProduct = asyncHandler(
-  async (req: AuthRequest, res: Response) => {
+  async (req: StoreRequest, res: Response) => {
     const userId = req.user!.userId;
     if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const storeId = req.userStore!.storeId;
+    if (!storeId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
     const files = req.files as Express.Multer.File[];
 
-    const result = await productService.createProduct(req.body, userId, files);
+    const result = await productService.createProduct(
+      userId,
+      storeId,
+      req.body,
+      files,
+    );
 
     return res.status(201).json(result);
   },
@@ -38,16 +48,18 @@ export const getProductBySlug = asyncHandler(
 );
 
 export const updateProduct = asyncHandler(
-  async (req: AuthRequest, res: Response) => {
+  async (req: StoreRequest, res: Response) => {
     const userId = req.user!.userId;
     const { productId } = req.params as { productId: string };
     const updates = req.body;
+    const storeId = req.userStore!.storeId;
 
     const files = req.files as Express.Multer.File[];
 
     const result = await productService.updateProduct(
       userId,
       productId,
+      storeId,
       updates,
       files,
     );
@@ -57,14 +69,16 @@ export const updateProduct = asyncHandler(
 );
 
 export const updateProductStatus = asyncHandler(
-  async (req: AuthRequest, res: Response) => {
+  async (req: StoreRequest, res: Response) => {
     const userId = req.user!.userId;
     const { productId } = req.params as { productId: string };
     const updates = req.body;
+    const storeId = req.userStore!.storeId;
 
     const result = await productService.updateProductStatus(
       userId,
       productId,
+      storeId,
       updates,
     );
 
@@ -73,34 +87,32 @@ export const updateProductStatus = asyncHandler(
 );
 
 export const softDeleteProduct = asyncHandler(
-  async (req: AuthRequest, res: Response) => {
+  async (req: StoreRequest, res: Response) => {
     const userId = req.user!.userId;
-    if (!userId) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-    const { productId } = req.params;
-    if (typeof productId !== "string") {
-      return res.status(400).json({ message: "Invalid productId" });
-    }
+    const { productId } = req.params as { productId: string };
+    const storeId = req.userStore!.storeId;
 
-    const result = await productService.softDeleteProduct(productId, userId);
+    const result = await productService.softDeleteProduct(
+      userId,
+      productId,
+      storeId,
+    );
 
     return res.status(200).json(result);
   },
 );
 
 export const hardDeleteProduct = asyncHandler(
-  async (req: AuthRequest, res: Response) => {
+  async (req: StoreRequest, res: Response) => {
     const userId = req.user!.userId;
-    if (!userId) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-    const { productId } = req.params;
-    if (typeof productId !== "string") {
-      return res.status(400).json({ message: "Invalid productId" });
-    }
+    const { productId } = req.params as { productId: string };
+    const storeId = req.userStore!.storeId;
 
-    const result = await productService.hardDeleteProduct(productId, userId);
+    const result = await productService.hardDeleteProduct(
+      userId,
+      productId,
+      storeId,
+    );
 
     return res.status(200).json(result);
   },

@@ -1,7 +1,8 @@
-import mongoose from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { IProduct, Product, User } from "../models";
 import { ProductPayload, UpdateProductPayload } from "../types/product";
 import {
+  ForbiddenError,
   NotFoundError,
   UnauthorizedError,
   ValidationError,
@@ -25,7 +26,7 @@ export interface ProductQuery {
   sort?: "price_asc" | "price_desc" | "newest";
 }
 
-export class ProductService {
+class ProductService {
   constructor(private readonly queue: Queue) {}
 
   private async generateUniqueSlug(name: string) {
@@ -44,22 +45,11 @@ export class ProductService {
   }
 
   async createProduct(
-    data: ProductPayload,
     userId: string,
+    storeId: string,
+    data: ProductPayload,
     files: Express.Multer.File[],
   ) {
-    const user = await User.findOne({ _id: userId });
-    console.log("user from DB in createProduct:", user);
-    if (!user) throw new NotFoundError("User");
-    if (!user.isVerified) {
-      console.log("User account not verified. Cannot create product.");
-      throw new UnauthorizedError("User account not verified");
-    }
-    if (user.isSuspended) {
-      console.log("User account suspended. Cannot create product.");
-      throw new UnauthorizedError("User account suspended");
-    }
-
     let imageObjects =
       files?.map((file) => ({
         url: file.path,
@@ -71,7 +61,7 @@ export class ProductService {
       const sku = this.generateSku(data.name, data.category);
 
       const productData: any = {
-        uploadedBy: user._id,
+        storeId: new Types.ObjectId(storeId),
         name: data.name,
         slug,
         sku,
@@ -93,6 +83,9 @@ export class ProductService {
       console.log("product create payload:", productData);
 
       const product = await Product.create(productData);
+      logger.info(
+        `Product ${product._id} created by User ${userId} for Store ${storeId}`,
+      );
 
       return SuccessRes({
         message: "New Product created",
@@ -204,7 +197,7 @@ export class ProductService {
   async getProductBySlug(slug: string) {
     const product = await Product.findOne({ slug, isActive: true })
       .populate("category")
-      .populate("uploadedBy", "name email")
+      .populate("storeId", "name logo description isVerified")
       .populate({ path: "variants", match: { isActive: true } });
 
     if (!product) {
@@ -221,19 +214,14 @@ export class ProductService {
   async updateProduct(
     userId: string,
     productId: string,
+    storeId: string,
     data: UpdateProductPayload,
     files: Express.Multer.File[],
   ) {
-    const user = await User.findOne({ _id: userId }).lean();
-    if (!user) throw new NotFoundError("User");
-    if (!user.isVerified)
-      throw new UnauthorizedError("User account not verified");
-    if (user.isSuspended) throw new UnauthorizedError("User account suspended");
-
     const product = await Product.findOne({ _id: productId, isDeleted: false });
     if (!product) throw new NotFoundError("Product");
 
-    if (product.storeId.toString() !== userId) {
+    if (product.storeId.toString() !== storeId.toString()) {
       throw new UnauthorizedError("You do not own this product");
     }
 
@@ -305,6 +293,10 @@ export class ProductService {
         });
       }
 
+      logger.info(
+        `Product ${productId} updated by User ${userId} for Store ${storeId}`,
+      );
+
       return SuccessRes({
         message: "Product updated",
         data: { product: product.toObject() },
@@ -329,18 +321,20 @@ export class ProductService {
   async updateProductStatus(
     userId: string,
     productId: string,
+    storeId: string,
     updates: Partial<Pick<IProduct, "isActive" | "isFeatured">>,
   ) {
     const product = await Product.findOneAndUpdate(
-      { _id: productId, uploadedBy: userId },
+      { _id: productId, storeId },
       { $set: updates },
       { new: true, runValidators: true },
     );
 
-    logger.info(`Product ${productId} updated by ${userId}`);
-
     if (!product) throw new NotFoundError("Product not found");
 
+    logger.info(
+      `Product ${productId} updated by User ${userId} for Store ${storeId}`,
+    );
     return SuccessRes({
       message: "Product updated",
       data: product,
@@ -348,9 +342,9 @@ export class ProductService {
     });
   }
 
-  async softDeleteProduct(productId: string, userId: string) {
+  async softDeleteProduct(userId: string, productId: string, storeId: string) {
     const product = await Product.findOneAndUpdate(
-      { _id: productId, uploadedBy: userId },
+      { _id: productId, storeId },
       {
         $set: {
           isActive: false,
@@ -365,19 +359,20 @@ export class ProductService {
       throw new NotFoundError("Product not found or unauthorized");
     }
 
-    logger.info(`Product ${productId} moved to trash by ${userId}`);
-
+    logger.info(
+      `Product ${productId} archived by User ${userId} for Store ${storeId}`,
+    );
     return SuccessRes({
       message: "Product soft-deleted",
       statusCode: 200,
     });
   }
 
-  async hardDeleteProduct(productId: string, userId: string) {
+  async hardDeleteProduct(userId: string, productId: string, storeId: string) {
     try {
       const product = await Product.findOne({
         _id: productId,
-        uploadedBy: userId,
+        storeId,
       });
 
       if (!product) {
@@ -397,6 +392,10 @@ export class ProductService {
           publicIds: publicIds,
         });
       }
+
+      logger.info(
+        `Product ${productId} Deleted by User ${userId} for Store ${storeId}`,
+      );
 
       return SuccessRes({
         message: "Product deleted",

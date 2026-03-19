@@ -6,7 +6,7 @@ import { Types } from "mongoose";
 
 export interface StoreRequest extends AuthRequest {
   userStore?: {
-    storeId: Types.ObjectId;
+    storeId: string;
   };
 }
 
@@ -32,7 +32,7 @@ export const injectStore = async (
   }
 
   req.userStore = {
-    storeId: store._id,
+    storeId: store._id.toString(),
   };
   next();
 };
