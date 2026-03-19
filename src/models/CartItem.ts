@@ -3,12 +3,13 @@ import { Schema, model, Types, Document } from "mongoose";
 export interface ICartItem extends Document {
   cartId: Types.ObjectId;
   productId: Types.ObjectId;
-  variantId?: Types.ObjectId;
+  variantId?: Types.ObjectId | null;
+  storeId: Types.ObjectId;
 
   quantity: number;
 
   priceAtAdd: number; // snapshot when added
-  currentPrice: number; // optional (for UI updates)
+  currentPrice: number; 
 
   createdAt: Date;
   updatedAt: Date;
@@ -30,6 +31,11 @@ const CartItemSchema = new Schema<ICartItem>({
     type: Schema.Types.ObjectId,
     ref: "Variant"
   },
+  storeId: {
+    type: Schema.Types.ObjectId,
+    ref: "Store",
+    required: true  
+  },
   quantity: {
     type: Number,
     required: true,
@@ -44,9 +50,8 @@ const CartItemSchema = new Schema<ICartItem>({
   }
 }, { timestamps: true });
 
-// Prevent duplicate product+variant in same cart
 CartItemSchema.index(
-  { cartId: 1, productId: 1, variantId: 1 },
+  { cartId: 1, productId: 1, variantId: 1, storeId: 1 },
   { unique: true }
 );
 

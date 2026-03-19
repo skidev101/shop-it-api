@@ -9,12 +9,10 @@ import {
 import { SuccessRes } from "../utils/responses";
 import slugify from "slugify";
 import { logger } from "../lib/logger";
-import { CloudinaryUtil } from "../utils/cloudinary";
 import { nanoid } from "nanoid";
 import { imageCleanupQueue } from "../queues/imageCleanup.queue";
 import { CreateProductInput } from "../validators/product.validator";
 import { Queue } from "bullmq";
-import { threadCpuUsage } from "node:process";
 
 export interface ProductQuery {
   page?: number;
