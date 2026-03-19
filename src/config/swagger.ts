@@ -9,7 +9,7 @@ export const setupSwagger = (app: Express) => {
   const docs = generateDocs();
 
   app.use("/api/v1/docs", swaggerUi.serve, swaggerUi.setup(docs));
-  app.get("/api/v1/docs.json", (req, res) => {
+  app.get("/api/v1/docs.json", (_req, res) => {
     res.json(docs);
   });
 };
