@@ -2,8 +2,9 @@ import { Schema, model, Types, Document } from "mongoose";
 
 export interface IOrder extends Document {
   userId: Types.ObjectId;
+  idempotencyKey: string;
 
-  status: "pending" | "paid" | "shipped" | "delivered" | "cancelled";
+  status: "pending_payment" | "paid" | "shipped" | "delivered" | "cancelled";
 
   totalAmount: number;
   discountAmount: number;
@@ -20,7 +21,8 @@ export interface IOrder extends Document {
     country: string;
     postalCode: string;
   };
-
+  paidAt: Date;
+  expiresAt: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,10 +34,16 @@ const OrderSchema = new Schema<IOrder>({
     required: true,
     index: true
   },
+  idempotencyKey: {
+    type: String,
+    required: true,
+    unique: true,
+    index: true
+  },
   status: {
     type: String,
-    enum: ["pending", "paid", "shipped", "delivered", "cancelled"],
-    default: "pending",
+    enum: ["pending_payment", "paid", "shipped", "delivered", "cancelled"],
+    default: "pending_payment",
     index: true
   },
   totalAmount: { type: Number, required: true },
@@ -55,6 +63,13 @@ const OrderSchema = new Schema<IOrder>({
     state: String,
     country: String,
     postalCode: String
+  },
+  paidAt: {
+    type: Date,
+  },
+  expiresAt: {
+    type: Date,
+    required: true
   }
 }, { timestamps: true });
 

@@ -15,8 +15,12 @@ import {
   ServerError,
   ValidationError,
 } from "../utils/api-errors";
+import { Queue } from "bullmq";
+import { orderCleanupQueue } from "../queues/orderCleanup.queue";
 
 class OrderService {
+  constructor(private readonly queue: Queue) {}
+
   private async getCartId(userId: string) {
     const cart = await Cart.findOne({ userId });
     if (!cart) throw new NotFoundError("Cart");
@@ -35,39 +39,25 @@ class OrderService {
     );
   }
 
-  private async handleStockReduction(
-    item: any,
-    session: mongoose.ClientSession,
+  async createOrder(
+    userId: string,
+    shippingAddress: any,
+    idempotencyKey: string,
   ) {
-    if (item.variantId) {
-      const update = await Variant.findOneAndUpdate(
-        { _id: item.variantId, stock: { $gte: item.quantity } },
-        { $inc: { stock: -item.quantity } },
-        { session, new: true },
-      );
-      if (!update) throw new ValidationError("Insufficient variant stock");
-    }
-
-    const prodUpdate = await Product.findOneAndUpdate(
-      { _id: item.productId, stock: { $gte: item.quantity } },
-      { $inc: { stock: -item.quantity } },
-      { session, new: true },
-    );
-    if (!prodUpdate) throw new ValidationError("Insufficient product stock");
-  }
-
-  async createOrder(userId: string, shippingAddress: any) {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
+      const existingOrder = await Order.findOne({ idempotencyKey }).session(
+        session,
+      );
+      if (existingOrder) return existingOrder;
+
       const cartId = await this.getCartId(userId);
       const cartItems = await CartItem.find({ cartId })
         .populate<{ productId: IProduct }>("productId")
         .session(session);
       if (!cartItems.length) throw new ValidationError("Cart is empty");
-
-      const productIds = cartItems.map((i) => i.productId);
 
       const stockOps = [];
       let totalAmount = 0;
@@ -104,8 +94,10 @@ class OrderService {
             userId,
             totalAmount,
             finalAmount: totalAmount,
+            idempotencyKey,
             shippingAddress,
-            status: "pending",
+            status: "pending_payment",
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000),
           },
         ],
         { session },
@@ -150,6 +142,13 @@ class OrderService {
       await CartItem.deleteMany({ cartId }).session(session);
 
       await session.commitTransaction();
+
+      await this.queue.add(
+        `cleanup-expired-order`,
+        { orderId: parentOrder._id },
+        { delay: 30 * 60 * 1000, jobId: `cleanup-${parentOrder._id}` },
+      );
+
       return parentOrder;
     } catch (error) {
       await session.abortTransaction();
@@ -158,7 +157,29 @@ class OrderService {
       session.endSession();
     }
   }
+
+
+  async handlePaymentSuccess(orderId: string, paymentId: string) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const order = await Order.findById(orderId).session(session);
+      if (!order) throw new NotFoundError("Order");
+
+      if (order.status === "paid") {
+        return order;
+      }
+
+      if (order.status !== "pending_payment") {
+        throw new ValidationError("Order not in payable state")
+      }
+
+      order.status = "paid";
+      order.paymentId = paymentId;
+    }
+  }
 }
 
-const orderService = new OrderService();
+const orderService = new OrderService(orderCleanupQueue);
 export default orderService;
