@@ -7,9 +7,9 @@ export interface IPayment extends Document {
   userId: Types.ObjectId;
   amount: number;
   currency: string;
-  paymentMethod: string;
+  method: string;
   transactionId: string;
-  status: "pending" | "completed" | "failed" | "refunded";
+  status: "pending" | "success" | "failed" | "refunded";
   metadata?: {}
   createdAt: Date;
   updatedAt: Date;
@@ -35,7 +35,7 @@ const PaymentSchema = new Schema<IPayment>({
     type: String,
     required: true
   },
-  paymentMethod: {
+  method: {
     type: String,
     required: true
   },
@@ -45,7 +45,7 @@ const PaymentSchema = new Schema<IPayment>({
   },
   status: {
     type: String,
-    enum: ["pending", "completed", "failed", "refunded"]
+    enum: ["pending", "success", "failed", "refunded"]
   },
   metadata: {
     type: String

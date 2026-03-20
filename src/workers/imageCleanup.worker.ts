@@ -1,7 +1,7 @@
 import { Worker } from "bullmq";
 import { logger } from "../lib/logger";
 import { redisConnection } from "../config/redis";
-import { imageCleanupProcessor } from "../processors/imageCleanup.processor";
+import { imageCleanupProcessor } from "../processors/imageCleanup.processors";
 
 export const setupImageWorker = () => {
   const worker = new Worker("image-cleanup", imageCleanupProcessor, {

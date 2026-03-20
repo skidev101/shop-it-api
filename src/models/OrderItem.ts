@@ -1,6 +1,7 @@
 import { Schema, model, Types, Document } from "mongoose";
 
 export interface IOrderItem extends Document {
+  storeId: Types.ObjectId;
   orderId: Types.ObjectId;
 
   productId: Types.ObjectId;
@@ -18,28 +19,37 @@ export interface IOrderItem extends Document {
   updatedAt: Date;
 }
 
-const OrderItemSchema = new Schema<IOrderItem>({
-  orderId: {
-    type: Schema.Types.ObjectId,
-    ref: "Order",
-    required: true,
-    index: true
-  },
-  productId: {
-    type: Schema.Types.ObjectId,
-    ref: "Product"
-  },
-  variantId: {
-    type: Schema.Types.ObjectId,
-    ref: "Variant"
-  },
+const OrderItemSchema = new Schema<IOrderItem>(
+  {
+    storeId: {
+      type: Schema.Types.ObjectId,
+      ref: "Store",
+      required: true,
+      index: true,
+    },
+    orderId: {
+      type: Schema.Types.ObjectId,
+      ref: "Order",
+      required: true,
+      index: true,
+    },
+    productId: {
+      type: Schema.Types.ObjectId,
+      ref: "Product",
+    },
+    variantId: {
+      type: Schema.Types.ObjectId,
+      ref: "Variant",
+    },
 
-  name: { type: String, required: true },
-  image: { type: String },
+    name: { type: String, required: true },
+    image: { type: String },
 
-  quantity: { type: Number, required: true },
-  price: { type: Number, required: true },
-  total: { type: Number, required: true }
-}, { timestamps: true });
+    quantity: { type: Number, required: true },
+    price: { type: Number, required: true },
+    total: { type: Number, required: true },
+  },
+  { timestamps: true },
+);
 
 export const OrderItem = model<IOrderItem>("OrderItem", OrderItemSchema);
