@@ -1,50 +1,104 @@
 ├── .env
 ├── .gitignore
+├── docker-compose.yml
 ├── index.ts
 ├── logs
    ├── combined.log
    └── error.log
 ├── package.json
 ├── pnpm-lock.yaml
+├── schematic.txt
 ├── src
    ├── config
+      ├── cloudinary.ts
       ├── db.ts
       ├── env.ts
-      └── mailer.ts
+      ├── mailer.ts
+      ├── redis.ts
+      └── swagger.ts
    ├── controllers
-      └── auth.controller.ts
+      ├── auth.controller.ts
+      ├── category.controller.ts
+      ├── product.controller.ts
+      └── user.controller.ts
+   ├── docs
+      ├── components.ts
+      ├── openapi.ts
+      └── paths
+         ├── auth.doc.ts
+         └── product.doc.ts
    ├── lib
       └── logger.ts
    ├── middlewares
-      ├── auth.ts
-      ├── errorHandler.ts
-      ├── rateLimiter.ts
-      └── requestLogger.ts
+      ├── auth.middleware.ts
+      ├── authorize.middleware.ts
+      ├── errorHandler.middleware.ts
+      ├── injectStore.middleware.ts
+      ├── rateLimiter.middleware.ts
+      ├── requestLogger.middleware.ts
+      └── validate.middleware.ts
    ├── models
       ├── Cart.ts
+      ├── CartItem.ts
       ├── Category.ts
       ├── Coupon.ts
       ├── Order.ts
+      ├── OrderItem.ts
       ├── Otp.ts
       ├── Payment.ts
       ├── Product.ts
       ├── RefreshToken.ts
       ├── Review.ts
+      ├── Store.ts
       ├── User.ts
+      ├── Variant.ts
+      ├── VendorOrder.ts
       ├── Wishlist.ts
       └── index.ts
+   ├── processors
+      ├── imageCleanup.processors.ts
+      └── orderCleanup.processor.ts
+   ├── queues
+      ├── imageCleanup.queue.ts
+      └── orderCleanup.queue.ts
    ├── routes
-      ├── auth.ts
+      ├── admin
+         ├── category.admin.routes.ts
+         └── product.admin.routes.ts
+      ├── auth.routes.ts
       ├── index.ts
-      └── product.ts
+      └── public
+         ├── category.public.routes.ts
+         └── product.public.routes.ts
    ├── services
       ├── auth.service.ts
-      └── product.service.ts
+      ├── cart.service.ts
+      ├── category.service.ts
+      ├── inventory.service.ts
+      ├── order.service.ts
+      ├── payment.service.ts
+      ├── product.service.ts
+      ├── store.service.ts
+      ├── user.service.ts
+      └── variant.service.ts
    ├── types
       ├── auth.ts
       ├── product.ts
       └── user.ts
-   └── utils
+   ├── utils
       ├── api-errors.ts
+      ├── cloudinary.ts
       └── responses.ts
+   ├── validators
+      ├── auth.validator.ts
+      ├── category.validators.ts
+      ├── product.validator.ts
+      ├── user.validator.ts
+      └── variant.validators.ts
+   └── workers
+      ├── imageCleanup.worker.ts
+      ├── index.ts
+      └── orderCleanup.worker.ts
+├── temp
+   └── snippet.txt
 └── tsconfig.json
