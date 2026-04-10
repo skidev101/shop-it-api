@@ -186,3 +186,7 @@ export class CartService {
     return cart;
   };
 }
+
+
+const cartService = new CartService();
+export default cartService;

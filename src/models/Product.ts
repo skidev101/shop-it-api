@@ -7,11 +7,12 @@ export interface IProduct extends Document {
   description: string;
   basePrice: number;
   comparePrice?: number | undefined;
-  sku: string;        
-  stock: number;     
+  sku: string;
+  stock: number;
+  reservedStock: number;
   category: Types.ObjectId;
   images: Array<{ url: string; public_id: string }>;
-  variants: Types.ObjectId[];  
+  variants: Types.ObjectId[];
   specifications: Record<string, string>;
   tags: string[];
   isActive: boolean;
@@ -61,15 +62,18 @@ const ProductSchema = new Schema<IProduct>(
       type: String,
       required: true,
       trim: true,
-      unique: true
+      unique: true,
     },
     stock: {
       type: Number,
       required: true,
       min: 0,
       default: 0,
-      // This is a denormalized field. It is NOT set by the client.
-      // It is recalculated by the service whenever a variant's stock changes.
+    },
+    reservedStock: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     category: {
       type: Schema.Types.ObjectId,
