@@ -4,6 +4,7 @@ import { generateDocs } from "../docs/openapi";
 
 import "../docs/paths/auth.doc";
 import "../docs/paths/product.doc";
+import "../docs/paths/order.doc";
 
 export const setupSwagger = (app: Express) => {
   const docs = generateDocs();
