@@ -10,9 +10,9 @@ import { Order, OrderItem, Product, Variant } from "../models";
 import inventoryService from "./inventory.service";
 
 class OrderService {
-  async createOrder(userId: string, payload: any) {
+  async createOrder(userId: string, idempotencyKey: string, payload: any) {
     const session = await mongoose.startSession();
-    const { idempotencyKey, shippingAddress } = payload;
+    const { shippingAddress } = payload;
 
     const existingOrder = await Order.findOne({ idempotencyKey });
     if (existingOrder) return existingOrder;
@@ -57,7 +57,7 @@ class OrderService {
         const productMap = new Map(products.map((p) => [p._id.toString(), p]));
         const variantMap = new Map(variants.map((v) => [v._id.toString(), v]));
 
-        let subtotal = 0;
+        let totalAmount = 0;
         const orderItemsPayload: any[] = [];
 
         for (const item of items) {
@@ -84,7 +84,8 @@ class OrderService {
             image = variant.image.url ?? product?.images?.[0]?.url;
           }
 
-          subtotal += price * item.quantity;
+          const total = price * item.quantity;
+          totalAmount += total;
 
           orderItemsPayload.push({
             storeId: item.storeId,
@@ -94,7 +95,7 @@ class OrderService {
             name,
             image,
             price,
-            total: subtotal,
+            total,
           });
         }
 
@@ -103,9 +104,9 @@ class OrderService {
         const order = new Order({
           userId,
           idempotencyKey,
-          totalAmount: subtotal,
+          totalAmount,
           discountAmount: 0,
-          finalAmount: subtotal,
+          finalAmount: totalAmount,
           shippingAddress,
           expiresAt,
         });
@@ -120,6 +121,8 @@ class OrderService {
           { session },
         );
 
+        await cartService.clearCart(userId, session);
+
         response = order;
       });
 
@@ -128,13 +131,11 @@ class OrderService {
       return response;
     } catch (err) {
       await idempotencyService.cleanupISession(idempotencyKey);
-
       throw err;
     } finally {
       session.endSession();
     }
   }
-
 }
 
 const orderService = new OrderService();

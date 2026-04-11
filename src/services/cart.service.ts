@@ -1,3 +1,4 @@
+import { ClientSession } from "mongoose";
 import { Cart } from "../models/Cart";
 import { CartItem } from "../models/CartItem";
 import { Product } from "../models/Product";
@@ -130,10 +131,10 @@ export class CartService {
     return SuccessRes({ message: "Item deleted" });
   }
 
-  async clearCart(userId: string) {
+  async clearCart(userId: string, session?: ClientSession) {
     const cart = await this.getOrCreateCart(userId);
 
-    await CartItem.deleteMany({ cartId: cart._id });
+    await CartItem.deleteMany({ cartId: cart._id }).session(session || null);
 
     return { success: true };
   }
