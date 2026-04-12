@@ -85,7 +85,7 @@ class OrderService {
           }
 
           const total = price * item.quantity;
-          totalAmount += total;
+          totalAmount += total; // final price
 
           orderItemsPayload.push({
             storeId: item.storeId,
