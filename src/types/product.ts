@@ -7,7 +7,7 @@ export interface ProductPayload {
   category: string;
   images: string[];
   variants?: Array<{name: string; options: string[]; stock: number}>;
-  specifications: Record<string, string>;
+  specifications: Array<{ key: string; value: string }>;
   isActive: boolean;
   tags: string[]
 }
@@ -20,7 +20,7 @@ export interface UpdateProductPayload {
   comparePrice?: number | null; // null = explicitly remove comparePrice
   category?: string;
   variants?: any[];
-  specifications?: Record<string, string>;
+  specifications?: Array<{ key: string; value: string }>;
   tags?: string[];
   stock?: number;
   removeImageIds?: string[]; // Cloudinary public_ids the client wants removed

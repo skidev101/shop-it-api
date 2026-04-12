@@ -13,7 +13,7 @@ export interface IProduct extends Document {
   category: Types.ObjectId;
   images: Array<{ url: string; public_id: string }>;
   variants: Types.ObjectId[];
-  specifications: Record<string, string>;
+  specifications: Array<{ key: string; value: string }>;
   tags: string[];
   isActive: boolean;
   isFeatured: boolean;
@@ -84,8 +84,8 @@ const ProductSchema = new Schema<IProduct>(
     images: {
       type: [
         {
-          url: { type: String, required: true },
-          public_id: { type: String, required: true },
+          url: { type: String, required: [true, "product image url is required"] },
+          public_id: { type: String, required: [true, "cloudinary public id is required"] },
         },
       ],
       required: true,
@@ -97,8 +97,13 @@ const ProductSchema = new Schema<IProduct>(
       },
     ],
     specifications: {
-      type: Map,
-      of: String,
+      type: [
+        {
+          key: { type: String, required: true },
+          value: { type: String, required: true },
+        },
+      ],
+      default: [],
     },
     isActive: {
       type: Boolean,

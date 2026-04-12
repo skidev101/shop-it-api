@@ -21,43 +21,27 @@ export const createProductSchema = z.object({
       .min(3, "Product name must be at least 3 characters")
       .openapi({ example: "Wireless Bluetooth Headphones" }),
     description: z.string().min(10, "Description is too short").openapi({
-      example:
-        "High-quality wireless Bluetooth headphones with noise cancellation",
+      example: "High-quality wireless Bluetooth headphones with noise cancellation",
     }),
-    basePrice: z.coerce
-      .number()
-      .positive("Price must be a positive number")
-      .openapi({ example: 99.99 }),
-    comparePrice: z.coerce
-      .number()
-      .positive("Price must be a positive number")
+    basePrice: z.number().positive("Price must be a positive number"), // No more z.coerce needed if sending JSON
+    comparePrice: z.number().positive().optional(),
+    stock: z.number().int().positive(),
+    category: z.string().min(1),
+    
+    // NEW: The image field(s) from Cloudinary
+    images: z.array(z.url("Invalid image URL")).min(1, "At least one image is required"),
+    
+    // NO MORE parseToJson! Zod can handle arrays/objects directly in JSON
+    specifications: z
+      .record(z.string(), z.string())
       .optional()
-      .openapi({ example: 99.99 }),
-    stock: z.coerce
-      .number()
-      .int("Stock must be an integer")
-      .positive("Stock must be a positive number")
-      .openapi({ example: 50 }),
-    category: z.string().min(1).openapi({ example: "Electronics" }),
-    specifications: z.preprocess(
-      parseToJson,
-      z
-        .record(z.string(), z.string())
-        .optional()
-        .openapi({
-          example: {
-            "Battery Life": "20 hours",
-            Connectivity: "Bluetooth 5.0",
-          },
-        }),
-    ),
-    tags: z.preprocess(
-      parseToJson,
-      z
-        .array(z.string())
-        .optional()
-        .openapi({ example: ["electronics", "audio", "wireless"] }),
-    ),
+      .openapi({
+        example: { "Battery Life": "20 hours", Connectivity: "Bluetooth 5.0" },
+      }),
+    tags: z
+      .array(z.string())
+      .optional()
+      .openapi({ example: ["electronics", "audio", "wireless"] }),
   }),
 });
 
