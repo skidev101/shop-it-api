@@ -11,7 +11,7 @@ export interface IProduct extends Document {
   stock: number;
   reservedStock: number;
   category: Types.ObjectId;
-  images: Array<{ url: string; public_id: string }>;
+  images: Array<{ url: string; public_id: string; isMain: boolean }>;
   variants: Types.ObjectId[];
   specifications: Array<{ key: string; value: string }>;
   tags: string[];
@@ -86,6 +86,7 @@ const ProductSchema = new Schema<IProduct>(
         {
           url: { type: String, required: [true, "product image url is required"] },
           public_id: { type: String, required: [true, "cloudinary public id is required"] },
+          isMain: { type: Boolean, default: false },
         },
       ],
       required: true,

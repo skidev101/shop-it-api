@@ -5,13 +5,12 @@ export interface ProductPayload {
   basePrice: number;
   comparePrice?: number;
   category: string;
-  images: string[];
-  variants?: Array<{name: string; options: string[]; stock: number}>;
+  images: Array<{ url: string; public_id: string; isMain: boolean }>;
+  variants?: Array<{ name: string; options: string[]; stock: number }>;
   specifications: Array<{ key: string; value: string }>;
   isActive: boolean;
-  tags: string[]
+  tags: string[];
 }
-
 
 export interface UpdateProductPayload {
   name?: string;
@@ -19,6 +18,7 @@ export interface UpdateProductPayload {
   basePrice?: number;
   comparePrice?: number | null; // null = explicitly remove comparePrice
   category?: string;
+  images: Array<{ url: string; public_id: string; isMain: boolean }>;
   variants?: any[];
   specifications?: Array<{ key: string; value: string }>;
   tags?: string[];

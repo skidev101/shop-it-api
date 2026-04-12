@@ -44,18 +44,7 @@ class ProductService {
     return `${catPart}-${namePart}-${randomPart}`;
   }
 
-  async createProduct(
-    userId: string,
-    storeId: string,
-    data: ProductPayload,
-    files: Express.Multer.File[],
-  ) {
-    let imageObjects =
-      files?.map((file) => ({
-        url: file.path,
-        public_id: file.filename,
-      })) || [];
-
+  async createProduct(userId: string, storeId: string, data: ProductPayload) {
     try {
       const slug = await this.generateUniqueSlug(data.name);
       const sku = this.generateSku(data.name, data.category);
@@ -68,7 +57,7 @@ class ProductService {
         description: data.description,
         basePrice: data.basePrice,
         category: data.category,
-        images: imageObjects,
+        images: data.images,
         specifications: data.specifications,
         tags: data.tags,
         stock: data.stock,
@@ -95,13 +84,13 @@ class ProductService {
         statusCode: 201,
       });
     } catch (error: any) {
-      if (imageObjects.length > 0) {
-        logger.error("DB error creating product. Cleaning up images...");
-        await this.queue.add("create-product-images", {
-          productId: "failed-create-product-id",
-          publicIds: imageObjects.map((img) => img.public_id),
-        });
-      }
+      // if (imageObjects.length > 0) {
+      //   logger.error("DB error creating product. Cleaning up images...");
+      //   await this.queue.add("create-product-images", {
+      //     productId: "failed-create-product-id",
+      //     publicIds: imageObjects.map((img) => img.public_id),
+      //   });
+      // }
 
       throw error;
     }
@@ -158,7 +147,7 @@ class ProductService {
 
     const total = await Product.countDocuments(filter);
 
-    console.log("products fetched:", products);
+    // console.log("products fetched:" products);
 
     const formattedResponse = products.map((product: IProduct) => {
       const productData = product.toObject();
@@ -216,7 +205,6 @@ class ProductService {
     productId: string,
     storeId: string,
     data: UpdateProductPayload,
-    files: Express.Multer.File[],
   ) {
     const product = await Product.findOne({ _id: productId, isDeleted: false });
     if (!product) throw new NotFoundError("Product");
@@ -224,12 +212,6 @@ class ProductService {
     if (product.storeId.toString() !== storeId.toString()) {
       throw new UnauthorizedError("You do not own this product");
     }
-
-    const newImages =
-      files?.map((file) => ({
-        url: file.path,
-        public_id: file.filename,
-      })) ?? [];
 
     const stagedCloudinaryDeletes: string[] = [];
 
@@ -249,6 +231,9 @@ class ProductService {
 
       if (data.category !== undefined) {
         product.category = new mongoose.Types.ObjectId(data.category as string);
+      }
+      if (data.images.length > 0) {
+        product.images = data.images;
       }
 
       // null = client explicitly wants to remove the comparePrice field
@@ -271,18 +256,18 @@ class ProductService {
           (img) => !data.removeImageIds!.includes(img.public_id),
         );
 
-        const incomingCount = newImages.length;
-        if (remainingImages.length + incomingCount === 0) {
-          throw new ValidationError("A product must retain at least one image");
-        }
+        // const incomingCount = newImages.length;
+        // if (remainingImages.length + incomingCount === 0) {
+        //   throw new ValidationError("A product must retain at least one image");
+        // }
 
         stagedCloudinaryDeletes.push(...data.removeImageIds);
         product.images = remainingImages;
       }
 
-      if (newImages.length > 0) {
-        product.images.push(...newImages);
-      }
+      // if (newImages.length > 0) {
+      //   product.images.push(...newImages);
+      // }
 
       await product.save();
 
@@ -303,16 +288,16 @@ class ProductService {
         statusCode: 200,
       });
     } catch (error: any) {
-      if (newImages.length > 0) {
-        logger.error(
-          "DB error during product update. Rolling back new upload(s)...",
-          newImages.length,
-        );
-        await this.queue.add("rollback-new-images", {
-          productId,
-          publicIds: newImages.map((img) => img.public_id),
-        });
-      }
+      // if (newImages.length > 0) {
+      //   logger.error(
+      //     "DB error during product update. Rolling back new upload(s)...",
+      //     newImages.length,
+      //   );
+      //   await this.queue.add("rollback-new-images", {
+      //     productId,
+      //     publicIds: newImages.map((img) => img.public_id),
+      //   });
+      // }
 
       throw error;
     }
