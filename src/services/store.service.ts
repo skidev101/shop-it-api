@@ -3,6 +3,7 @@ import { Store } from "../models/Store";
 import { ValidationError, NotFoundError } from "../utils/api-errors";
 import { nanoid } from "nanoid";
 import { SuccessRes } from "../utils/responses";
+import { imageCleanupQueue } from "../queues/imageCleanup.queue";
 import { Queue } from "bullmq";
 
 export class StoreService {
@@ -95,3 +96,7 @@ export class StoreService {
     });
   }
 }
+
+
+const storeService = new StoreService(imageCleanupQueue);
+export default storeService;

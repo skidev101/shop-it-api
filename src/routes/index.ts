@@ -6,6 +6,7 @@ import vendorProductRoutes from "./vendor/product.vendor.routes";
 import publicCategoryRoutes from "./public/category.public.routes";
 import adminCategoryRoutes from "./admin/category.admin.routes";
 import customerOrderRoutes from "./customer/order.customer.routes";
+import vendorStoreRoutes from "./vendor/vendor.store.routes";
 
 const router: Router = Router();
 
@@ -39,5 +40,6 @@ router.use("/customer/order", customerOrderRoutes);
 
 // vendor routes
 router.use("/vendor/product", vendorProductRoutes);
+router.use("/vendor/store", vendorStoreRoutes);
 
 export default router;
