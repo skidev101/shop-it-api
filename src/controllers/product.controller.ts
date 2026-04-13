@@ -8,10 +8,9 @@ export const createProduct = asyncHandler(
     const userId = req.user!.userId;
 
     const payload = req.body;
-    const files = req.files as Express.Multer.File[];
     const storeId = payload.storeId;
 
-    const result = await productService.createProduct(userId, storeId, payload, files);
+    const result = await productService.createProduct(userId, storeId, payload);
 
     return res.status(201).json(result);
   },
@@ -24,7 +23,7 @@ export const getProducts = asyncHandler(
     const result = await productService.getProducts(query as ProductQuery);
 
     return res.status(200).json(result);
-  }
+  },
 );
 
 export const getProductBySlug = asyncHandler(
@@ -36,7 +35,6 @@ export const getProductBySlug = asyncHandler(
   },
 );
 
-
 export const updateProduct = asyncHandler(
   async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
@@ -44,9 +42,13 @@ export const updateProduct = asyncHandler(
     const storeId = req.body.storeId;
 
     const payload = req.body;
-    const files = req.files as Express.Multer.File[];
 
-    const result = await productService.updateProduct(userId, productId, storeId,payload, files);
+    const result = await productService.updateProduct(
+      userId,
+      productId,
+      storeId,
+      payload
+    );
 
     return res.status(200).json(result);
   },
@@ -60,7 +62,12 @@ export const updateProductStatus = asyncHandler(
 
     const payload = req.body;
 
-    const result = await productService.updateProductStatus(userId, productId, storeId, payload);
+    const result = await productService.updateProductStatus(
+      userId,
+      productId,
+      storeId,
+      payload,
+    );
 
     return res.status(200).json(result);
   },

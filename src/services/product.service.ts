@@ -73,7 +73,7 @@ class ProductService {
 
       const product = await Product.create(productData);
       logger.info(
-        `Product ${product._id} created by User ${userId} for Store ${storeId}`,
+        `Product ${product._id} created by vendor ${userId} for Store ${storeId}`,
       );
 
       return SuccessRes({
@@ -84,13 +84,14 @@ class ProductService {
         statusCode: 201,
       });
     } catch (error: any) {
-      // if (imageObjects.length > 0) {
-      //   logger.error("DB error creating product. Cleaning up images...");
-      //   await this.queue.add("create-product-images", {
-      //     productId: "failed-create-product-id",
-      //     publicIds: imageObjects.map((img) => img.public_id),
-      //   });
-      // }
+      logger.error("Error creating product", error);
+      if (data.images.length > 0) {
+        logger.error("Error creating product. Cleaning up images...");
+        await this.queue.add("create-product-images", {
+          productId: "failed-create-product-id",
+          publicIds: data.images.map((img) => img.public_id),
+        });
+      }
 
       throw error;
     }
@@ -256,18 +257,18 @@ class ProductService {
           (img) => !data.removeImageIds!.includes(img.public_id),
         );
 
-        // const incomingCount = newImages.length;
-        // if (remainingImages.length + incomingCount === 0) {
-        //   throw new ValidationError("A product must retain at least one image");
-        // }
+        const incomingCount = data.images.length;
+        if (remainingImages.length + incomingCount === 0) {
+          throw new ValidationError("A product must retain at least one image");
+        }
 
         stagedCloudinaryDeletes.push(...data.removeImageIds);
         product.images = remainingImages;
       }
 
-      // if (newImages.length > 0) {
-      //   product.images.push(...newImages);
-      // }
+      if (data.images.length > 0) {
+        product.images.push(...data.images);
+      }
 
       await product.save();
 
@@ -288,16 +289,16 @@ class ProductService {
         statusCode: 200,
       });
     } catch (error: any) {
-      // if (newImages.length > 0) {
-      //   logger.error(
-      //     "DB error during product update. Rolling back new upload(s)...",
-      //     newImages.length,
-      //   );
-      //   await this.queue.add("rollback-new-images", {
-      //     productId,
-      //     publicIds: newImages.map((img) => img.public_id),
-      //   });
-      // }
+      if (data.images.length > 0) {
+        logger.error(
+          "DB error during product update. Rolling back new upload(s)...",
+          data.images.length,
+        );
+        await this.queue.add("rollback-new-images", {
+          productId,
+          publicIds: data.images.map((img) => img.public_id),
+        });
+      }
 
       throw error;
     }
