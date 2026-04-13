@@ -8,7 +8,9 @@ export const createProduct = asyncHandler(
     const userId = req.user!.userId;
 
     const payload = req.body;
+    console.log("Received payload:", payload);
     const storeId = payload.storeId;
+    console.log("storeId:", storeId);
     if (!storeId) {
       return res
         .status(400)

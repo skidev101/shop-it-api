@@ -51,6 +51,7 @@ export const createProductSchema = z.object({
       .array(z.string())
       .optional()
       .openapi({ example: ["electronics", "audio", "wireless"] }),
+    storeId: z.string().min(1, "storeId is required"),
   }),
 });
 
@@ -99,6 +100,7 @@ export const updateProductSchema = z.object({
       .array(z.string())
       .optional()
       .openapi({ example: ["electronics", "audio", "wireless"] }),
+    storeId: z.string().min(1, "storeId is required").optional(),
   }),
 });
 

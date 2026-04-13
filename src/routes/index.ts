@@ -6,7 +6,7 @@ import vendorProductRoutes from "./vendor/product.vendor.routes";
 import publicCategoryRoutes from "./public/category.public.routes";
 import adminCategoryRoutes from "./admin/category.admin.routes";
 import customerOrderRoutes from "./customer/order.customer.routes";
-import vendorStoreRoutes from "./vendor/vendor.store.routes";
+import vendorStoreRoutes from "./vendor/store.vendor.routes";
 
 const router: Router = Router();
 
