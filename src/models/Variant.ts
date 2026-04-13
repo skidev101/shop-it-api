@@ -1,7 +1,7 @@
 import { Document, Schema, Types, model } from "mongoose";
 
 export interface IVariant extends Document {
-  product: Types.ObjectId;
+  productId: Types.ObjectId;
   sku: string;
   attributes: Array<{ name: string; value: string }>;
   price?: number;
@@ -16,7 +16,7 @@ export interface IVariant extends Document {
 
 const VariantSchema = new Schema<IVariant>(
   {
-    product: {
+    productId: {
       type: Schema.Types.ObjectId,
       ref: "Product",
       required: [true, "Product reference is required"],

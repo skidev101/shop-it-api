@@ -7,6 +7,7 @@ import publicCategoryRoutes from "./public/category.public.routes";
 import adminCategoryRoutes from "./admin/category.admin.routes";
 import customerOrderRoutes from "./customer/order.customer.routes";
 import vendorStoreRoutes from "./vendor/store.vendor.routes";
+import customerCartRoutes from "./customer/cart.customer.routes";
 
 const router: Router = Router();
 
@@ -37,6 +38,7 @@ router.use("/admin/category", adminCategoryRoutes);
 
 // customer routes
 router.use("/customer/order", customerOrderRoutes);
+router.use("/customer/cart", customerCartRoutes);
 
 // vendor routes
 router.use("/vendor/product", vendorProductRoutes);

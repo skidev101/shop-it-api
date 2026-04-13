@@ -35,7 +35,7 @@ class OrderService {
 
     try {
       await session.withTransaction(async () => {
-        const { data } = await cartService.getCart(userId);
+        const { data } = await cartService.getCartItems(userId);
         const items = data.items;
 
         if (!items.length) {

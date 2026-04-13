@@ -1,5 +1,5 @@
-import { ClientSession } from "mongoose";
-import { Cart } from "../models/Cart";
+import mongoose, { ClientSession } from "mongoose";
+import { Cart, ICart } from "../models/Cart";
 import { CartItem } from "../models/CartItem";
 import { Product } from "../models/Product";
 import { Variant } from "../models/Variant";
@@ -7,17 +7,27 @@ import { NotFoundError, ValidationError } from "../utils/api-errors";
 import { SuccessRes } from "../utils/responses";
 
 export class CartService {
-  async getOrCreateCart(userId: string) {
-    let cart = await Cart.findOne({ userId });
-
-    if (!cart) {
-      cart = await Cart.create({ userId });
-    }
+  private async getOrCreateCart(
+    userId: string,
+    options: { session?: ClientSession } = {},
+  ) {
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+    const cart = await Cart.findOneAndUpdate<ICart>(
+      { userId: userObjectId },
+      {
+        $setOnInsert: { userId: userObjectId },
+      },
+      {
+        new: true,
+        upsert: true,
+        session: options.session,
+      },
+    );
 
     return cart;
   }
 
-  async getCart(userId: string) {
+  async getCartItems(userId: string) {
     const cart = await this.getOrCreateCart(userId);
 
     const items = await CartItem.find({ cartId: cart._id })
@@ -43,51 +53,116 @@ export class CartService {
       throw new ValidationError("Quantity must be greater than 0");
     }
 
-    const cart = await this.getOrCreateCart(userId);
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    const product = await Product.findById(productId);
-    if (!product) throw new NotFoundError("Product");
+    try {
+      // 1. Get or create cart (within transaction)
+      const cart = await this.getOrCreateCart(userId, { session });
 
-    let price = product.basePrice;
+      // 2. Fetch product
+      const product = await Product.findById(productId).session(session);
+      if (!product) throw new NotFoundError("Product");
 
-    if (variantId) {
-      const variant = await Variant.findById(variantId);
-      if (!variant) throw new NotFoundError("Variant");
+      let price = product.basePrice;
+      let stock: number;
 
-      if (variant.stock < quantity) {
-        throw new ValidationError("Insufficient stock");
+      // 3. Handle variant logic
+      let variant = null;
+      if (variantId) {
+        variant = await Variant.findById(variantId).session(session);
+        if (!variant) throw new NotFoundError("Variant");
+
+        // Ensure variant belongs to product
+        if (variant.productId.toString() !== productId) {
+          throw new ValidationError("Variant does not belong to product");
+        }
+
+        stock = variant.stock;
+        price = variant.price ?? product.basePrice;
+      } else {
+        stock = product.stock;
       }
 
-      price = variant.price ?? product.basePrice;
-    }
-
-    const existing = await CartItem.findOneAndUpdate(
-      {
+      // 4. Find existing cart item
+      const query = {
         cartId: cart._id,
         productId,
         variantId: variantId || null,
         storeId: product.storeId,
-      },
-      {
-        $inc: { quantity },
-        $set: { currentPrice: price },
-      },
-      { new: true },
-    );
+      };
 
-    if (existing) return existing;
+      const existingItem = await CartItem.findOne(query).session(session);
 
-    const item = await CartItem.create({
-      cartId: cart._id,
-      productId,
-      variantId: variantId || null,
-      storeId: product.storeId,
-      quantity,
-      priceAtAdd: price,
-      currentPrice: price,
-    });
+      const newQuantity = (existingItem?.quantity || 0) + quantity;
 
-    return item;
+      // 5. Atomic stock enforcement (critical)
+      if (stock < newQuantity) {
+        throw new ValidationError("Insufficient stock");
+      }
+
+      // 6. Upsert cart item
+      const item = await CartItem.findOneAndUpdate(
+        query,
+        {
+          $inc: { quantity },
+          $set: {
+            currentPrice: price, // latest price always reflected
+          },
+          $setOnInsert: {
+            priceAtAdd: price, // immutable initial price
+            storeId: product.storeId,
+          },
+        },
+        {
+          new: true,
+          upsert: true,
+          session,
+        },
+      );
+
+      // 7. OPTIONAL: Reserve stock (strong consistency model)
+      // This prevents overselling across users
+      if (variant) {
+        const updated = await Variant.updateOne(
+          {
+            _id: variantId,
+            stock: { $gte: quantity }, // atomic check
+          },
+          {
+            $inc: { stock: -quantity },
+          },
+          { session },
+        );
+
+        if (updated.modifiedCount === 0) {
+          throw new ValidationError("Insufficient stock (race condition)");
+        }
+      } else {
+        const updated = await Product.updateOne(
+          {
+            _id: productId,
+            stock: { $gte: quantity },
+          },
+          {
+            $inc: { stock: -quantity },
+          },
+          { session },
+        );
+
+        if (updated.modifiedCount === 0) {
+          throw new ValidationError("Insufficient stock (race condition)");
+        }
+      }
+
+      await session.commitTransaction();
+      return item;
+    } catch (err) {
+      await session.abortTransaction();
+      throw err;
+    } finally {
+      session.endSession();
+    }
   }
 
   async updateItemQuantity(
@@ -185,9 +260,8 @@ export class CartService {
       }
     }
     return cart;
-  };
+  }
 }
-
 
 const cartService = new CartService();
 export default cartService;
