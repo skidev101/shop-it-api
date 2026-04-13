@@ -1,5 +1,3 @@
-
-
 export { User, IUser } from "./User";
 export { Cart, ICart } from "./Cart";
 export { CartItem, ICartItem } from "./CartItem";
@@ -11,6 +9,8 @@ export { OrderItem, IOrderItem } from "./OrderItem";
 export { Otp, IOtp } from "./Otp";
 export { Payment, IPayment } from "./Payment";
 export { Variant, IVariant } from "./Variant";
+export { Store, IStore } from "./Store";
+export { Tag, ITag } from "./Tag";
 export { Product, IProduct } from "./Product";
 export { RefreshToken, IRefreshToken } from "./RefreshToken";
 export { Review, IReview } from "./Review";

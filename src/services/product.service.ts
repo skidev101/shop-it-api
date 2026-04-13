@@ -1,5 +1,5 @@
 import mongoose, { Types } from "mongoose";
-import { IProduct, Product, User } from "../models";
+import { IProduct, Product, User, Tag } from "../models";
 import { ProductPayload, UpdateProductPayload } from "../types/product";
 import {
   ForbiddenError,
@@ -35,6 +35,27 @@ class ProductService {
     return slug;
   }
 
+  private async processTags(tagNames: string[]): Promise<Types.ObjectId[]> {
+    const processedTagIds: Types.ObjectId[] = [];
+
+    for (const name of tagNames) {
+      const cleanName = name.toLowerCase().trim();
+      const slug = slugify(name, { lower: true, strict: true });
+
+      const tag = await Tag.findOneAndUpdate(
+        { name: cleanName },
+        {
+          $set: { name: cleanName, slug },
+          $inc: { usageCount: 1 },
+        },
+        { upsert: true, new: true },
+      );
+      processedTagIds.push(tag._id as Types.ObjectId);
+    }
+
+    return processedTagIds;
+  }
+
   private generateSku(name: string, category: string): string {
     const catPart = category.substring(0, 3).toUpperCase();
     const namePart = name.substring(0, 3).toUpperCase();
@@ -49,6 +70,11 @@ class ProductService {
       const slug = await this.generateUniqueSlug(data.name);
       const sku = this.generateSku(data.name, data.category);
 
+      let tagIds: Types.ObjectId[] = [];
+      if (data.tags && data.tags.length > 0) {
+        tagIds = await this.processTags(data.tags);
+      }
+
       const productData: any = {
         storeId: new Types.ObjectId(storeId),
         name: data.name,
@@ -59,7 +85,7 @@ class ProductService {
         category: data.category,
         images: data.images,
         specifications: data.specifications,
-        tags: data.tags,
+        tags: tagIds,
         stock: data.stock,
         isActive: true,
         isFeatured: false,
@@ -225,7 +251,6 @@ class ProductService {
       if (data.description !== undefined)
         product.description = data.description;
       if (data.basePrice !== undefined) product.basePrice = data.basePrice;
-      if (data.tags !== undefined) product.tags = data.tags;
       if (data.specifications !== undefined)
         product.specifications = data.specifications;
       if (data.stock !== undefined) product.stock = data.stock;
@@ -236,7 +261,14 @@ class ProductService {
       if (data.images.length > 0) {
         product.images = data.images;
       }
-
+      if (data.tags !== undefined && data.tags.length > 0) {
+        data.tags.forEach((tag) => {
+          const tagId = new mongoose.Types.ObjectId(tag);
+          if (!product.tags.includes(tagId)) {
+            product.tags.push(tagId);
+          }
+        });
+      }
       // null = client explicitly wants to remove the comparePrice field
       if (data.comparePrice !== undefined) {
         if (data.comparePrice === null) {
@@ -268,6 +300,19 @@ class ProductService {
 
       if (data.images.length > 0) {
         product.images.push(...data.images);
+      }
+
+      let tagIds: Types.ObjectId[] = [];
+      if (data.tags && data.tags.length > 0) {
+        tagIds = await this.processTags(data.tags);
+      }
+
+      if (tagIds.length > 0) {
+        tagIds.forEach((tagId) => {
+          if (!product.tags.includes(tagId)) {
+            product.tags.push(tagId);
+          }
+        });
       }
 
       await product.save();
