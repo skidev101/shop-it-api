@@ -13,7 +13,7 @@ export interface IProduct extends Document {
   category: Types.ObjectId;
   images: Array<{ url: string; public_id: string; isMain: boolean }>;
   variants: Types.ObjectId[];
-  specifications: Array<{ key: string; value: string }>;
+  specifications: Array<{ name: string; value: string }>;
   tags: Types.ObjectId[];
   isActive: boolean;
   isFeatured: boolean;
@@ -100,7 +100,7 @@ const ProductSchema = new Schema<IProduct>(
     specifications: {
       type: [
         {
-          key: { type: String, required: true },
+          name: { type: String, required: true },
           value: { type: String, required: true },
         },
       ],

@@ -15,7 +15,7 @@ import {
 
 const router: Router = Router();
 
-router.use(authenticate, authorize("vendor"));
+router.use(authenticate, authorize("vendor", "admin"));
 router.post(
   "/new",
   validate(createProductSchema),

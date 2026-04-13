@@ -9,6 +9,11 @@ export const createProduct = asyncHandler(
 
     const payload = req.body;
     const storeId = payload.storeId;
+    if (!storeId) {
+      return res
+        .status(400)
+        .json({ message: "storeId is required in the request body." });
+    }
 
     const result = await productService.createProduct(userId, storeId, payload);
 
@@ -18,7 +23,8 @@ export const createProduct = asyncHandler(
 
 export const getProducts = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const { query } = req.query;
+    const query = req.query;
+    console.log("Received query:", query);
 
     const result = await productService.getProducts(query as ProductQuery);
 
@@ -40,6 +46,11 @@ export const updateProduct = asyncHandler(
     const userId = req.user!.userId;
     const productId = req.params.productId as string;
     const storeId = req.body.storeId;
+    if (!storeId) {
+      return res
+        .status(400)
+        .json({ message: "storeId is required in the request body." });
+    }
 
     const payload = req.body;
 
@@ -47,7 +58,7 @@ export const updateProduct = asyncHandler(
       userId,
       productId,
       storeId,
-      payload
+      payload,
     );
 
     return res.status(200).json(result);

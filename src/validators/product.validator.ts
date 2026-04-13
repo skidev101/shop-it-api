@@ -3,16 +3,16 @@ import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 
 extendZodWithOpenApi(z);
 
-const parseToJson = (val: any) => {
-  if (typeof val === "string") {
-    try {
-      return JSON.parse(val);
-    } catch {
-      return val;
-    }
-  }
-  return val;
-};
+// const parseToJson = (val: any) => {
+//   if (typeof val === "string") {
+//     try {
+//       return JSON.parse(val);
+//     } catch {
+//       return val;
+//     }
+//   }
+//   return val;
+// };
 
 export const createProductSchema = z.object({
   body: z.object({
@@ -24,9 +24,9 @@ export const createProductSchema = z.object({
       example:
         "High-quality wireless Bluetooth headphones with noise cancellation",
     }),
-    basePrice: z.number().positive("Price must be a positive number"), // No more z.coerce needed if sending JSON
-    comparePrice: z.number().positive().optional(),
-    stock: z.number().int().positive(),
+    basePrice: z.coerce.number().positive("Price must be a positive number"), // No more z.coerce needed if sending JSON
+    comparePrice: z.coerce.number().positive().optional(),
+    stock: z.coerce.number().int().positive(),
     category: z.string().min(1),
 
     // NEW: The image field(s) from Cloudinary
@@ -86,25 +86,19 @@ export const updateProductSchema = z.object({
       .optional()
       .openapi({ example: 50 }),
     category: z.string().min(1).optional().openapi({ example: "Electronics" }),
-    specifications: z.preprocess(
-      parseToJson,
-      z
-        .record(z.string(), z.string())
-        .optional()
-        .openapi({
-          example: {
-            "Battery Life": "20 hours",
-            Connectivity: "Bluetooth 5.0",
-          },
+    specifications: z
+      .array(
+        z.object({
+          name: z.string().min(1).openapi({ example: "Battery Life" }),
+          value: z.string().min(1).openapi({ example: "20 hours" }),
         }),
-    ),
-    tags: z.preprocess(
-      parseToJson,
-      z
-        .array(z.string())
-        .optional()
-        .openapi({ example: ["electronics", "audio", "wireless"] }),
-    ),
+      )
+      .optional(),
+
+    tags: z
+      .array(z.string())
+      .optional()
+      .openapi({ example: ["electronics", "audio", "wireless"] }),
   }),
 });
 
