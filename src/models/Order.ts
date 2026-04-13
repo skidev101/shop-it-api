@@ -19,7 +19,7 @@ export interface IOrder extends Document {
     city: string;
     state: string;
     country: string;
-    postalCode: string;
+    postalCode: number;
   };
   paidAt: Date;
   expiresAt: Date;
@@ -42,7 +42,7 @@ const OrderSchema = new Schema<IOrder>({
   },
   status: {
     type: String,
-    enum: ["pending_payment", "paid", "shipped", "delivered", "cancelled"],
+    enum: ["pending", "paid", "shipped", "delivered", "cancelled"],
     default: "pending_payment",
     index: true
   },
@@ -62,7 +62,7 @@ const OrderSchema = new Schema<IOrder>({
     city: String,
     state: String,
     country: String,
-    postalCode: String
+    postalCode: Number
   },
   paidAt: {
     type: Date,

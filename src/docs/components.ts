@@ -1,7 +1,7 @@
 import { registry } from "./openapi";
 import { registerSchema, loginSchema } from "../validators/auth.validator";
 import { createProductSchema } from "../validators/product.validator";
-import { createOrderSchema } from "../validators/order.validator";
+import { createOrderSchema } from "../validators/order.validators";
 
 // This creates the "Schemas" section at the bottom of Swagger UI
 
