@@ -1,7 +1,8 @@
 import { Router, Request, Response } from "express";
 import authRoutes from "./auth.routes";
 import publicProductRoutes from "./public/product.public.routes";
-import adminProductRoutes from "./admin/product.admin.routes";
+// import adminProductRoutes from "./admin/product.admin.routes";
+import vendorProductRoutes from "./vendor/product.vendor.routes";
 import publicCategoryRoutes from "./public/category.public.routes";
 import adminCategoryRoutes from "./admin/category.admin.routes";
 import customerOrderRoutes from "./customer/order.customer.routes";
@@ -30,10 +31,13 @@ router.use("/product", publicProductRoutes);
 router.use("/category", publicCategoryRoutes);
 
 // admin routes
-router.use("/admin/product", adminProductRoutes);
+// router.use("/admin/product", adminProductRoutes);
 router.use("/admin/category", adminCategoryRoutes);
 
 // customer routes
 router.use("/customer/order", customerOrderRoutes);
+
+// vendor routes
+router.use("/vendor/product", vendorProductRoutes);
 
 export default router;

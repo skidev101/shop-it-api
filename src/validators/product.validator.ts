@@ -21,16 +21,25 @@ export const createProductSchema = z.object({
       .min(3, "Product name must be at least 3 characters")
       .openapi({ example: "Wireless Bluetooth Headphones" }),
     description: z.string().min(10, "Description is too short").openapi({
-      example: "High-quality wireless Bluetooth headphones with noise cancellation",
+      example:
+        "High-quality wireless Bluetooth headphones with noise cancellation",
     }),
     basePrice: z.number().positive("Price must be a positive number"), // No more z.coerce needed if sending JSON
     comparePrice: z.number().positive().optional(),
     stock: z.number().int().positive(),
     category: z.string().min(1),
-    
+
     // NEW: The image field(s) from Cloudinary
-    images: z.array(z.url("Invalid image URL")).min(1, "At least one image is required"),
-    
+    images: z
+      .array(
+        z.object({
+          url: z.url("Invalid image URL"),
+          public_id: z.string(),
+          isMain: z.boolean(),
+        }),
+      )
+      .min(1, "At least one image is required"),
+
     // NO MORE parseToJson! Zod can handle arrays/objects directly in JSON
     specifications: z
       .record(z.string(), z.string())

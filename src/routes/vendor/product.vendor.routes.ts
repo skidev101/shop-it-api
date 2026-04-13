@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { upload } from "../../config/cloudinary";
 import { authenticate } from "../../middlewares/auth.middleware";
 import {
   createProductSchema,
@@ -16,17 +15,15 @@ import {
 
 const router: Router = Router();
 
-router.use(authenticate, authorize("admin"));
+router.use(authenticate, authorize("vendor"));
 router.post(
   "/new",
-  upload.array("images", 5),
   validate(createProductSchema),
   createProduct,
 );
 
 router.patch(
   "/:productId/update",
-  upload.array("images", 5),
   validate(updateProductSchema),
   updateProduct,
 );
