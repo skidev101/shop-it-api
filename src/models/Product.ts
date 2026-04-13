@@ -14,7 +14,7 @@ export interface IProduct extends Document {
   images: Array<{ url: string; public_id: string; isMain: boolean }>;
   variants: Types.ObjectId[];
   specifications: Array<{ key: string; value: string }>;
-  tags: string[];
+  tags: Types.ObjectId[];
   isActive: boolean;
   isFeatured: boolean;
   ratingAverage: number;
@@ -117,7 +117,8 @@ const ProductSchema = new Schema<IProduct>(
       index: true,
     },
     tags: {
-      type: [String],
+      type: [Schema.Types.ObjectId],
+      ref: "Tag",
       default: [],
     },
     ratingAverage: {
