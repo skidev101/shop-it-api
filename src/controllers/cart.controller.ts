@@ -32,7 +32,7 @@ export const getAllCartItems = asyncHandler(
 export const updateItemQuantity = asyncHandler(
   async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
-    const productId = req.body.productId as string;
+    const productId = req.params.productId as string;
     const quantity = req.body.quantity as number;
 
     const result = await cartService.updateItemQuantity(
@@ -48,7 +48,7 @@ export const updateItemQuantity = asyncHandler(
 export const deleteItem = asyncHandler(
   async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
-    const productId = req.body.productId as string;
+    const productId = req.params.productId as string;
 
     const result = await cartService.removeItem(userId, productId);
 

@@ -14,7 +14,7 @@ router.use(authenticate, authorize("customer", "admin"));
 
 router.get("/", getAllCartItems);
 router.post("/add", addToCart);
-router.put("/update", updateItemQuantity);
-router.delete("/delete", deleteItem);
+router.put("/update/:productId", updateItemQuantity);
+router.delete("/delete/:productId", deleteItem);
 
 export default router;
