@@ -73,7 +73,7 @@ class OrderService {
             const variant = variantMap.get(item.variantId);
             if (!variant) throw new NotFoundError("Variant");
 
-            if (variant.product.toString() !== item.productId) {
+            if (variant.productId.toString() !== item.productId) {
               throw new ValidationError("Invalid variant id for product");
             }
 
