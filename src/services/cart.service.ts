@@ -57,23 +57,19 @@ export class CartService {
     session.startTransaction();
 
     try {
-      // 1. Get or create cart (within transaction)
       const cart = await this.getOrCreateCart(userId, { session });
 
-      // 2. Fetch product
       const product = await Product.findById(productId).session(session);
       if (!product) throw new NotFoundError("Product");
 
       let price = product.basePrice;
       let stock: number;
 
-      // 3. Handle variant logic
       let variant = null;
       if (variantId) {
         variant = await Variant.findById(variantId).session(session);
         if (!variant) throw new NotFoundError("Variant");
 
-        // Ensure variant belongs to product
         if (variant.productId.toString() !== productId) {
           throw new ValidationError("Variant does not belong to product");
         }
@@ -84,7 +80,6 @@ export class CartService {
         stock = product.stock;
       }
 
-      // 4. Find existing cart item
       const query = {
         cartId: cart._id,
         productId,
@@ -94,14 +89,6 @@ export class CartService {
 
       const existingItem = await CartItem.findOne(query).session(session);
 
-      const newQuantity = (existingItem?.quantity || 0) + quantity;
-
-      // 5. Atomic stock enforcement (critical)
-      if (stock < newQuantity) {
-        throw new ValidationError("Insufficient stock");
-      }
-
-      // 6. Upsert cart item
       const item = await CartItem.findOneAndUpdate(
         query,
         {
@@ -121,8 +108,6 @@ export class CartService {
         },
       );
 
-      // 7. OPTIONAL: Reserve stock (strong consistency model)
-      // This prevents overselling across users
       if (variant) {
         const variantObjectId = new mongoose.Types.ObjectId(variantId);
         const updated = await Variant.updateOne(
