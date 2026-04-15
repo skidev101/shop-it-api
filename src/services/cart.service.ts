@@ -12,15 +12,15 @@ export class CartService {
     options: { session?: ClientSession } = {},
   ) {
     const userObjectId = new mongoose.Types.ObjectId(userId);
-    const cart = await Cart.findOneAndUpdate<ICart>(
-      { userId: userObjectId },
+    const cart = await Cart.findOneAndUpdate(
+      { userId: userObjectId } as any,
       {
         $setOnInsert: { userId: userObjectId },
       },
       {
         new: true,
         upsert: true,
-        session: options.session,
+        session: options.session ?? null,
       },
     );
 
@@ -124,9 +124,10 @@ export class CartService {
       // 7. OPTIONAL: Reserve stock (strong consistency model)
       // This prevents overselling across users
       if (variant) {
+        const variantObjectId = new mongoose.Types.ObjectId(variantId);
         const updated = await Variant.updateOne(
           {
-            _id: variantId,
+            _id: variantObjectId,
             stock: { $gte: quantity }, // atomic check
           },
           {

@@ -13,8 +13,6 @@ const CartSchema = new Schema<ICart>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
-      unique: true, // one cart per user
     },
     couponId: {
       type: Schema.Types.ObjectId,
@@ -23,5 +21,6 @@ const CartSchema = new Schema<ICart>(
   },
   { timestamps: true },
 );
+CartSchema.index({ userId: 1 }, { unique: true });
 
-export const Cart: Model<ICart> = model<ICart>("Cart", CartSchema);
+export const Cart = model<ICart>("Cart", CartSchema);
