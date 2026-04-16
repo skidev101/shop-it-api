@@ -22,4 +22,6 @@ export const env = {
   CLOUDINARY_SECRET: process.env.CLOUDINARY_SECRET!,
   REDIS_HOST: process.env.REDIS_HOST!,
   REDIS_PORT: process.env.REDIS_PORT!,
+  PAYMENT_SECRET_KEY: process.env.PAYMENT_SECRET_KEY!,
+  FRONTEND_URL: process.env.FRONTEND_URL!,
 }

@@ -12,7 +12,7 @@ import {
   notFoundHandler,
 } from "./src/middlewares/errorHandler.middleware";
 import { connectDB } from "./src/config/db";
-import helmet from "helmet"; 
+import helmet from "helmet";
 import morgan from "morgan";
 import compression from "compression";
 import { setupSwagger } from "./src/config/swagger";
@@ -43,10 +43,16 @@ app.use(compression());
 
 app.set("trust proxy", 1); // Trust first proxy for secure cookies behind proxies/load balancers
 
-app.use(express.json({ limit: "10mb" }));
+app.use(
+  express.json({
+    limit: "10mb",
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf; // Store the original buffer
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
 
 setupSwagger(app);
 
@@ -64,7 +70,6 @@ async function startServer() {
       const envLabel = env.IS_PROD ? "PRODUCTION" : "DEVELOPMENT";
       logger.info(`[${envLabel}] Server running on port ${PORT}`);
     });
-
   } catch (error) {
     logger.error("Server failed to start", error);
     process.exit(1);
