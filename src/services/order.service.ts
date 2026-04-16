@@ -122,7 +122,7 @@ class OrderService {
           { session },
         );
 
-        await cartService.clearCart(userId, session);
+        await cartService.clearCart(userId);
 
         response = order;
       });

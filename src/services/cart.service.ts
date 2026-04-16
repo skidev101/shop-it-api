@@ -80,14 +80,26 @@ export class CartService {
         stock = product.stock;
       }
 
+      const existingItem = await CartItem.findOne({
+        cartId: cart._id,
+        productId,
+        variantId: variantId || null,
+      }).session(session);
+
+      const currentInCart = existingItem ? existingItem.quantity : 0;
+
+      if (stock < currentInCart + quantity) {
+        throw new ValidationError(
+          `Cannot add ${quantity} more. You already have ${currentInCart} in cart, and total stock is ${stock}.`,
+        );
+      }
+
       const query = {
         cartId: cart._id,
         productId,
         variantId: variantId || null,
         storeId: product.storeId,
       };
-
-      const existingItem = await CartItem.findOne(query).session(session);
 
       const item = await CartItem.findOneAndUpdate(
         query,
@@ -108,40 +120,8 @@ export class CartService {
         },
       );
 
-      if (variant) {
-        const variantObjectId = new mongoose.Types.ObjectId(variantId);
-        const updated = await Variant.updateOne(
-          {
-            _id: variantObjectId,
-            stock: { $gte: quantity }, // atomic check
-          },
-          {
-            $inc: { stock: -quantity },
-          },
-          { session },
-        );
-
-        if (updated.modifiedCount === 0) {
-          throw new ValidationError("Insufficient stock (race condition)");
-        }
-      } else {
-        const updated = await Product.updateOne(
-          {
-            _id: productId,
-            stock: { $gte: quantity },
-          },
-          {
-            $inc: { stock: -quantity },
-          },
-          { session },
-        );
-
-        if (updated.modifiedCount === 0) {
-          throw new ValidationError("Insufficient stock (race condition)");
-        }
-      }
-
       await session.commitTransaction();
+
       return item;
     } catch (err) {
       await session.abortTransaction();
@@ -192,10 +172,10 @@ export class CartService {
     return SuccessRes({ message: "Item deleted" });
   }
 
-  async clearCart(userId: string, session?: ClientSession) {
+  async clearCart(userId: string) {
     const cart = await this.getOrCreateCart(userId);
 
-    await CartItem.deleteMany({ cartId: cart._id }).session(session || null);
+    await CartItem.deleteMany({ cartId: cart._id });
 
     return { success: true };
   }

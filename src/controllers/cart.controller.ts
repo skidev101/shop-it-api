@@ -55,3 +55,16 @@ export const deleteItem = asyncHandler(
     return res.status(200).json(result);
   },
 );
+
+export const deleteAllItem = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const productId = req.params.productId as string;
+
+    const result = await cartService.clearCart(userId);
+
+    return res.status(200).json(result);
+  },
+);
+
+
