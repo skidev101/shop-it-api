@@ -56,7 +56,7 @@ export const deleteItem = asyncHandler(
   },
 );
 
-export const deleteAllItem = asyncHandler(
+export const clearCart = asyncHandler(
   async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
     const productId = req.params.productId as string;

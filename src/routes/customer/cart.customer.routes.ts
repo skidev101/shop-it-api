@@ -6,6 +6,7 @@ import {
   addToCart,
   updateItemQuantity,
   deleteItem,
+  clearCart,
 } from "../../controllers/cart.controller";
 
 const router: Router = Router();
@@ -16,5 +17,6 @@ router.get("/", getAllCartItems);
 router.post("/add", addToCart);
 router.put("/update/:productId", updateItemQuantity);
 router.delete("/delete/:productId", deleteItem);
+router.delete("/clear", clearCart);
 
 export default router;
