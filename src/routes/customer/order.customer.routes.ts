@@ -7,7 +7,7 @@ import {
 
 const router: Router = Router();
 
-router.use(authenticate, authorize("customer"));
+router.use(authenticate, authorize("customer", "admin"));
 router.post("/new", createOrder);
 
 export default router;

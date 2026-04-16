@@ -4,7 +4,7 @@ export interface IOrder extends Document {
   userId: Types.ObjectId;
   idempotencyKey: string;
 
-  status: "pending_payment" | "paid" | "shipped" | "delivered" | "cancelled";
+  status: "pending" | "paid" | "shipped" | "delivered" | "cancelled";
 
   totalAmount: number;
   discountAmount: number;
@@ -27,50 +27,62 @@ export interface IOrder extends Document {
   updatedAt: Date;
 }
 
-const OrderSchema = new Schema<IOrder>({
-  userId: {
-    type: Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
-    index: true
-  },
-  idempotencyKey: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
-  status: {
-    type: String,
-    enum: ["pending", "paid", "shipped", "delivered", "cancelled"],
-    default: "pending_payment",
-    index: true
-  },
-  totalAmount: { type: Number, required: true },
-  discountAmount: { type: Number, default: 0 },
-  finalAmount: { type: Number, required: true },
+const OrderSchema = new Schema<IOrder>(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    idempotencyKey: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+    },
+    status: {
+      type: String,
+      enum: ["pending", "paid", "shipped", "delivered", "cancelled"],
+      default: "pending",
+      index: true,
+    },
+    totalAmount: { type: Number, required: true },
+    discountAmount: { type: Number, default: 0 },
+    finalAmount: { type: Number, required: true },
 
-  paymentId: {
-    type: Schema.Types.ObjectId,
-    ref: "Payment"
-  },
+    paymentId: {
+      type: Schema.Types.ObjectId,
+      ref: "Payment",
+    },
 
-  shippingAddress: {
-    fullName: String,
-    phone: String,
-    street: String,
-    city: String,
-    state: String,
-    country: String,
-    postalCode: Number
+    shippingAddress: {
+      fullName: String,
+      phone: String,
+      street: String,
+      city: String,
+      state: String,
+      country: String,
+      postalCode: Number,
+    },
+    paidAt: {
+      type: Date,
+    },
+    expiresAt: {
+      type: Date,
+      required: true,
+    },
   },
-  paidAt: {
-    type: Date,
-  },
-  expiresAt: {
-    type: Date,
-    required: true
-  }
-}, { timestamps: true });
+  { timestamps: true },
+);
+
+OrderSchema.virtual("items", {
+  ref: "OrderItem",
+  localField: "_id",
+  foreignField: "orderId",
+});
+
+OrderSchema.set("toObject", { virtuals: true });
+OrderSchema.set("toJSON", { virtuals: true });
 
 export const Order = model<IOrder>("Order", OrderSchema);

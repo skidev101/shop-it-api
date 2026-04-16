@@ -4,16 +4,16 @@ import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 extendZodWithOpenApi(z);
 
 export const createOrderSchema = z.object({
-    items: z.array(
-      z.object({
-        productId: z.string().min(1).openapi({ example: "abc123" }),
-        quantity: z.coerce
-          .number()
-          .int("Quantity must be an integer")
-          .positive("Quantity must be a positive number")
-          .openapi({ example: 2 }),
-      }),
-    ),
+    // items: z.array(
+    //   z.object({
+    //     productId: z.string().min(1).openapi({ example: "abc123" }),
+    //     quantity: z.coerce
+    //       .number()
+    //       .int("Quantity must be an integer")
+    //       .positive("Quantity must be a positive number")
+    //       .openapi({ example: 2 }),
+    //   }),
+    // ),
   body: z.object({
     shippingAddress: z.object({
       fullName: z.string().min(1).openapi({ example: "John Doe" }),

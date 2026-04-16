@@ -8,7 +8,7 @@ export const orderCleanupProcessor = async (job: Job) => {
   if (!orderId) return;
 
   const order = await Order.findById(orderId);
-  if (!order || order.status !== "pending_payment") {
+  if (!order || order.status !== "pending") {
     return;
   }
 

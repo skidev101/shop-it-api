@@ -176,32 +176,33 @@ class ProductService {
 
     // console.log("products fetched:" products);
 
-    const formattedResponse = products.map((product: IProduct) => {
-      const productData = product.toObject();
+    // const formattedResponse = products.map((product: IProduct) => {
+    //   const productData = product.toObject();
 
-      return {
-        id: productData._id,
-        name: productData.name,
-        slug: productData.slug,
-        description: productData.description,
-        stock: productData.stock,
-        price: productData.price,
-        comparePrice: productData.comparePrice,
-        category: productData.category,
-        images: productData.images,
-        variants: productData.variants,
-        specifications: productData.specifications,
-        isActive: productData.isActive,
-        isFeatured: productData.isFeatured,
-        tags: productData.tags,
-        createdAt: productData.createdAt,
-      };
-    });
+    //   return {
+    //     id: productData._id,
+    //     name: productData.name,
+    //     slug: productData.slug,
+    //     storeId: productData.storeId,
+    //     description: productData.description,
+    //     stock: productData.stock,
+    //     price: productData.price,
+    //     comparePrice: productData.comparePrice,
+    //     category: productData.category,
+    //     images: productData.images,
+    //     variants: productData.variants,
+    //     specifications: productData.specifications,
+    //     isActive: productData.isActive,
+    //     isFeatured: productData.isFeatured,
+    //     tags: productData.tags,
+    //     createdAt: productData.createdAt,
+    //   };
+    // });
 
     return SuccessRes({
       message: "Products fetched",
       data: {
-        products: formattedResponse,
+        products: products.map((p) => p.toObject()),
         total,
         page,
         pages: Math.ceil(total / limit),

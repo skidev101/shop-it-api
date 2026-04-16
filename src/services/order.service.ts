@@ -38,6 +38,7 @@ class OrderService {
       await session.withTransaction(async () => {
         const { data } = await cartService.getCartItems(userId);
         const items = data.items;
+        console.log("cart items:", items);
 
         if (!items.length) {
           throw new ValidationError("Cart is empty");
@@ -58,11 +59,16 @@ class OrderService {
         const productMap = new Map(products.map((p) => [p._id.toString(), p]));
         const variantMap = new Map(variants.map((v) => [v._id.toString(), v]));
 
+        console.log("Fetched products:", productMap);
+        console.log("Fetched variants:", variantMap);
+
         let totalAmount = 0;
         const orderItemsPayload: any[] = [];
 
         for (const item of items) {
-          const product = productMap.get(item.productId);
+          console.log("begin search with productId:", productIds)
+          const product = productMap.get(item.productId._id.toString());
+          console.log("Found product:", product);
           if (!product) throw new NotFoundError("Product");
 
           let price = product.basePrice;
@@ -136,6 +142,14 @@ class OrderService {
     } finally {
       session.endSession();
     }
+  }
+
+
+  async getOrder(userId: string, orderId: string) {
+    const order = await Order.findOne({ _id: orderId, userId }).populate("items");
+    if (!order) throw new NotFoundError("Order");
+
+    return order;
   }
 }
 
