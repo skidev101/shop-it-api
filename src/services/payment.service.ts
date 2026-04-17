@@ -1,24 +1,32 @@
 import axios from "axios";
 import { env } from "../config/env";
 import crypto from "crypto";
-import { Order } from "../models";
+import { Order, User } from "../models";
 import { logger } from "../lib/logger";
+import { NotFoundError } from "../utils/api-errors";
 
 class PaymentService {
   private readonly secretKey: string = env.PAYMENT_SECRET_KEY;
 
-  async initializePayment(order: any, email: string) {
+  async initializePayment(userId: string, orderId: string) {
+    const order = await Order.findOne({ _id: orderId });
+    if (!order) throw new NotFoundError("Order");
+
+    const user = await User.findById(userId);
+    if (!user) throw new NotFoundError("User");
+
     const url = "https://api.paystack.co/transaction/initialize";
 
     const amountInKobo = Math.round(order.finalAmount * 100);
 
     const body = {
-      email,
+      email: user.email,
       amount: amountInKobo,
-      reference: `order_${order._id}_${Date.now()}`,
+      reference: `order_${orderId}_${Date.now()}`,
       callback_url: `${env.FRONTEND_URL}/payment/callback`,
       metadata: {
-        orderId: order._id.toString(),
+        orderId: orderId,
+        userId: userId,
       },
     };
 
@@ -48,8 +56,8 @@ class PaymentService {
 
       const order = await Order.findById(orderId);
 
-      if (!order) return; 
-      logger.error(`order ${orderId} not found at payment service`)
+      if (!order) return;
+      logger.error(`order ${orderId} not found at payment service`);
 
       if (order.status === "paid") return;
 
