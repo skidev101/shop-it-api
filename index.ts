@@ -45,7 +45,7 @@ app.set("trust proxy", 1); // Trust first proxy for secure cookies behind proxie
 
 app.use(
   express.json({
-    limit: "10mb",
+    limit: "300kb",
     verify: (req: any, _res, buf) => {
       req.rawBody = buf; // Store the original buffer
     },

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { z, ZodError } from "zod";
+import { z } from "zod";
 import { ValidationError } from "../utils/api-errors";
 
 type RequestSchema = z.ZodObject<{
